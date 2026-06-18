@@ -217,6 +217,7 @@ export type ConsultationBooking = {
   caseSummary: string
   consent: boolean
   status: 'confirmed' | 'completed' | 'cancelled'
+  usedExpertCredit?: boolean
   expertNotes?: string
 }
 

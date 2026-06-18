@@ -8,7 +8,7 @@ import { countries, currencies, subjects, universities } from './data/referenceD
 import { defaultDocuments } from './data/documents'
 import { studyPhases } from './data/studyPlan'
 import { experts } from './data/experts'
-import { plans } from './data/plans'
+import { canUseFeature, minimumPlanName, plans, type GatedFeature } from './data/plans'
 import { bdtToPreferred, buildNotifications, defaultProfile, estimateCost, formatPreferredCurrency, preferredToBdt, scoreProgram } from './lib/personalization'
 import type { ApplicationRecord, ApplicationStatus, AppNotification, ChatMessage, ConsultationBooking, DocumentFile, Expert, Program, ProgramScore, RoadmapItem, Scholarship, StudyPhaseId, SubscriptionPlan, SubscriptionState, UserDocument, UserProfile, View } from './types'
 import './App.css'
@@ -173,17 +173,18 @@ function Onboarding({ profile, onComplete }: { profile: UserProfile, onComplete:
   )
 }
 
-function Sidebar({ view, setView, onLogout, documentCount }: { view: View, setView: (view: View) => void, onLogout: () => void, documentCount: number }) {
-  const links: { id: View, label: string, icon: string }[] = [
+function Sidebar({ view, setView, onLogout, documentCount, planId, onLocked }: { view: View, setView: (view: View) => void, onLogout: () => void, documentCount: number, planId: SubscriptionPlan['id'], onLocked: (feature: GatedFeature) => void }) {
+  const planName = plans.find((plan) => plan.id === planId)?.name ?? 'Discovery'
+  const links: { id: View, label: string, icon: string, feature?: GatedFeature }[] = [
     { id: 'dashboard', label: 'Overview', icon: '⌂' },
-    { id: 'study-plan', label: 'Study plan', icon: '◎' },
+    { id: 'study-plan', label: 'Study plan', icon: '◎', feature: 'studyPlan' },
     { id: 'explore', label: 'Explore programs', icon: '⌕' },
-    { id: 'shortlist', label: 'Shortlist & compare', icon: '◇' },
-    { id: 'scholarships', label: 'Scholarships', icon: '$' },
-    { id: 'roadmap', label: 'My roadmap', icon: '✓' },
-    { id: 'documents', label: 'Documents', icon: '▤' },
-    { id: 'adviser', label: 'Ask Navigator', icon: '✦' },
-    { id: 'experts', label: 'Expert consultations', icon: '◉' },
+    { id: 'shortlist', label: 'Shortlist & compare', icon: '◇', feature: 'shortlist' },
+    { id: 'scholarships', label: 'Scholarships', icon: '$', feature: 'scholarships' },
+    { id: 'roadmap', label: 'My roadmap', icon: '✓', feature: 'roadmap' },
+    { id: 'documents', label: 'Documents', icon: '▤', feature: 'documents' },
+    { id: 'adviser', label: 'Ask Navigator', icon: '✦', feature: 'adviser' },
+    { id: 'experts', label: 'Expert consultations', icon: '◉', feature: 'expertBooking' },
     { id: 'subscription', label: 'Plans & usage', icon: '◆' },
     { id: 'profile', label: 'My profile', icon: '○' },
   ]
@@ -192,10 +193,13 @@ function Sidebar({ view, setView, onLogout, documentCount }: { view: View, setVi
       <Logo />
       <nav>
         <span className="nav-label">Workspace</span>
-        {links.map((link) => <button key={link.id} className={view === link.id || (view === 'program' && link.id === 'explore') ? 'active' : ''} onClick={() => setView(link.id)}><span>{link.icon}</span>{link.label}{link.id === 'documents' && documentCount > 0 && <em className="nav-badge">{documentCount}</em>}</button>)}
+        {links.map((link) => {
+          const locked = Boolean(link.feature && !canUseFeature(planId, link.feature))
+          return <button key={link.id} className={`${view === link.id || (view === 'program' && link.id === 'explore') ? 'active' : ''} ${locked ? 'locked-nav' : ''}`} onClick={() => locked && link.feature ? onLocked(link.feature) : setView(link.id)}><span>{link.icon}</span>{link.label}{locked && <em className="lock-badge">⌁</em>}{link.id === 'documents' && !locked && documentCount > 0 && <em className="nav-badge">{documentCount}</em>}</button>
+        })}
       </nav>
       <div className="sidebar-bottom">
-        <div className="mini-profile"><span>SR</span><div><strong>Samira Rahman</strong><small>Essential plan</small></div></div>
+        <div className="mini-profile"><span>SR</span><div><strong>Samira Rahman</strong><small>{planName} plan</small></div></div>
         <button className="logout" onClick={onLogout}>Log out</button>
       </div>
     </aside>
@@ -478,7 +482,24 @@ function EmptyState({ title, text }: { title: string, text: string }) {
   return <div className="empty-state"><span>◇</span><h3>{title}</h3><p>{text}</p></div>
 }
 
-function ProgramDetail({ program, score, profile, goBack, goRoadmap, saved, toggleSaved }: { program: Program, score: ProgramScore, profile: UserProfile, goBack: () => void, goRoadmap: () => void, saved: boolean, toggleSaved: () => void }) {
+const gatedFeatureLabels: Record<GatedFeature, string> = {
+  studyPlan: 'Full study plan',
+  shortlist: 'Shortlist and comparison',
+  scholarships: 'Scholarship matching',
+  roadmap: 'Personal roadmap',
+  documents: 'Document center',
+  adviser: 'Navigator adviser',
+  advancedCosts: 'Advanced cost scenarios',
+  customDocumentFolders: 'Custom document folders',
+  expertBooking: 'Expert consultations',
+  priorityExperts: 'Priority expert access',
+}
+
+function LockedFeature({ feature, compact = false, onUpgrade }: { feature: GatedFeature, compact?: boolean, onUpgrade: () => void }) {
+  return <div className={`locked-feature ${compact ? 'compact' : ''}`}><span>⌁</span><div><strong>{gatedFeatureLabels[feature]}</strong><small>Available on the {minimumPlanName(feature)} plan.</small></div><button onClick={onUpgrade}>View plans</button></div>
+}
+
+function ProgramDetail({ program, score, profile, goBack, goRoadmap, saved, toggleSaved, advancedCosts, onUpgrade }: { program: Program, score: ProgramScore, profile: UserProfile, goBack: () => void, goRoadmap: () => void, saved: boolean, toggleSaved: () => void, advancedCosts: boolean, onUpgrade: () => void }) {
   const [scholarshipPercent, setScholarshipPercent] = useState(0)
   const cost = estimateCost(program, profile, scholarshipPercent)
   return (
@@ -498,7 +519,7 @@ function ProgramDetail({ program, score, profile, goBack, goRoadmap, saved, togg
             <section className="panel"><span className="eyebrow">Career direction</span><h2>Where this can take you</h2><div className="career-tags">{program.careerPaths.map((item) => <span key={item}>{item}</span>)}</div></section>
           </main>
           <aside>
-            <section className="panel cost-card"><span className="eyebrow">Interactive cost estimate · {profile.preferredCurrency}</span><div className="cost-line"><small>Tuition</small><strong>{formatPreferredCurrency(cost.tuitionBdt, profile.preferredCurrency)}</strong></div><div className="cost-line"><small>Living estimate</small><strong>{formatPreferredCurrency(cost.livingBdt, profile.preferredCurrency)}</strong></div><div className="cost-line"><small>Visa, travel & applications</small><strong>{formatPreferredCurrency(cost.visaTravelBdt + cost.applicationBdt, profile.preferredCurrency)}</strong></div><label className="scholarship-input">Expected tuition scholarship <strong>{scholarshipPercent}%</strong><input type="range" min="0" max="100" step="10" value={scholarshipPercent} onChange={(event) => setScholarshipPercent(Number(event.target.value))} /></label><div className="cost-line green-text"><small>Scholarship deduction</small><strong>- {formatPreferredCurrency(cost.scholarshipBdt, profile.preferredCurrency)}</strong></div><div className="cost-line total"><small>Estimated first year</small><strong>{formatPreferredCurrency(cost.firstYearBdt, profile.preferredCurrency)}</strong></div><div className={`budget-result ${cost.budgetGapBdt <= 0 ? 'within' : 'gap'}`}><strong>{cost.budgetGapBdt <= 0 ? 'Within your budget' : `${formatPreferredCurrency(cost.budgetGapBdt, profile.preferredCurrency)} above budget`}</strong><small>Your stated annual budget: {formatPreferredCurrency(profile.annualBudgetBdt, profile.preferredCurrency)}</small></div><small className="rate-note">Prototype conversion uses fixed mock exchange rates, not live market rates.</small><button className="primary wide" onClick={goRoadmap}>Add to my roadmap →</button><button className={`secondary wide ${saved ? 'saved-button' : ''}`} onClick={toggleSaved}>{saved ? '✓ Saved to shortlist' : 'Save to shortlist'}</button></section>
+            <section className="panel cost-card"><span className="eyebrow">Cost estimate · {profile.preferredCurrency}</span><div className="cost-line"><small>Tuition</small><strong>{formatPreferredCurrency(cost.tuitionBdt, profile.preferredCurrency)}</strong></div><div className="cost-line"><small>Living estimate</small><strong>{formatPreferredCurrency(cost.livingBdt, profile.preferredCurrency)}</strong></div><div className="cost-line"><small>Visa, travel & applications</small><strong>{formatPreferredCurrency(cost.visaTravelBdt + cost.applicationBdt, profile.preferredCurrency)}</strong></div>{advancedCosts ? <><label className="scholarship-input">Expected tuition scholarship <strong>{scholarshipPercent}%</strong><input type="range" min="0" max="100" step="10" value={scholarshipPercent} onChange={(event) => setScholarshipPercent(Number(event.target.value))} /></label><div className="cost-line green-text"><small>Scholarship deduction</small><strong>- {formatPreferredCurrency(cost.scholarshipBdt, profile.preferredCurrency)}</strong></div></> : <LockedFeature feature="advancedCosts" compact onUpgrade={onUpgrade} />}<div className="cost-line total"><small>Estimated first year</small><strong>{formatPreferredCurrency(cost.firstYearBdt, profile.preferredCurrency)}</strong></div><div className={`budget-result ${cost.budgetGapBdt <= 0 ? 'within' : 'gap'}`}><strong>{cost.budgetGapBdt <= 0 ? 'Within your budget' : `${formatPreferredCurrency(cost.budgetGapBdt, profile.preferredCurrency)} above budget`}</strong><small>Your stated annual budget: {formatPreferredCurrency(profile.annualBudgetBdt, profile.preferredCurrency)}</small></div><small className="rate-note">Prototype conversion uses fixed mock exchange rates, not live market rates.</small><button className="primary wide" onClick={goRoadmap}>Add to my roadmap →</button><button className={`secondary wide ${saved ? 'saved-button' : ''}`} onClick={toggleSaved}>{saved ? '✓ Saved to shortlist' : 'Save to shortlist'}</button></section>
             <section className="panel"><span className="eyebrow">Entry requirements</span><ul className="requirements">{program.requirements.map((item) => <li key={item}>{item}</li>)}</ul><div className="official-source"><span className="source-shield">✓</span><div><strong>Official reference available</strong><small>{program.sourceLabel}<br />Checked {program.verifiedAt}</small></div><ExternalLink href={program.programUrl}>Open source</ExternalLink></div><small className="source-note">Prototype values may be simplified. Always confirm fees, requirements and deadlines on the official page.</small></section>
           </aside>
         </div>
@@ -646,11 +667,14 @@ function LaterStageChecklist({ title, locked, tasks, values, onToggle }: { title
   return <section className={`panel later-checklist ${locked ? 'locked' : ''}`}><div className="section-title"><h2>{title}</h2>{locked && <span className="locked-pill">Unlocks after offer</span>}</div>{tasks.map(([id, label]) => <label key={id}><input type="checkbox" disabled={locked} checked={Boolean(values[id])} onChange={() => onToggle(id)} /><span>{label}</span></label>)}</section>
 }
 
-function Experts({ profile, documents, bookings, setBookings }: {
+function Experts({ profile, documents, bookings, setBookings, plan, subscription, setSubscription }: {
   profile: UserProfile
   documents: UserDocument[]
   bookings: ConsultationBooking[]
   setBookings: React.Dispatch<React.SetStateAction<ConsultationBooking[]>>
+  plan: SubscriptionPlan
+  subscription: SubscriptionState
+  setSubscription: React.Dispatch<React.SetStateAction<SubscriptionState>>
 }) {
   const [specialization, setSpecialization] = useState('All expertise')
   const [country, setCountry] = useState('All countries')
@@ -704,7 +728,7 @@ function Experts({ profile, documents, bookings, setBookings }: {
         })}</section>}
       </div>
       {selectedExpert && <ExpertProfileModal expert={selectedExpert} profile={profile} onClose={() => setSelectedExpert(null)} onBook={() => { setBookingExpert(selectedExpert); setSelectedExpert(null) }} />}
-      {bookingExpert && <BookingModal expert={bookingExpert} profile={profile} documents={documents} onClose={() => setBookingExpert(null)} onConfirm={(booking) => { setBookings((current) => [...current, booking]); setBookingExpert(null); setToast('Consultation booked successfully.') }} />}
+      {bookingExpert && <BookingModal expert={bookingExpert} profile={profile} documents={documents} availableExpertCredits={subscription.usage.expertCredits} priorityAccess={canUseFeature(plan.id, 'priorityExperts')} onClose={() => setBookingExpert(null)} onConfirm={(booking) => { setBookings((current) => [...current, booking]); if (booking.usedExpertCredit) setSubscription((current) => ({ ...current, usage: { ...current.usage, expertCredits: Math.max(0, current.usage.expertCredits - 1) } })); setBookingExpert(null); setToast(booking.usedExpertCredit ? 'Consultation booked using an expert credit.' : 'Consultation booked successfully.') }} />}
     </>
   )
 }
@@ -721,7 +745,7 @@ function ExpertProfileModal({ expert, profile, onClose, onBook }: { expert: Expe
   </section></div>
 }
 
-function BookingModal({ expert, profile, documents, onClose, onConfirm }: { expert: Expert, profile: UserProfile, documents: UserDocument[], onClose: () => void, onConfirm: (booking: ConsultationBooking) => void }) {
+function BookingModal({ expert, profile, documents, availableExpertCredits, priorityAccess, onClose, onConfirm }: { expert: Expert, profile: UserProfile, documents: UserDocument[], availableExpertCredits: number, priorityAccess: boolean, onClose: () => void, onConfirm: (booking: ConsultationBooking) => void }) {
   const [step, setStep] = useState(1)
   const [serviceId, setServiceId] = useState(expert.services[0].id)
   const dates = Object.keys(expert.availability)
@@ -730,6 +754,7 @@ function BookingModal({ expert, profile, documents, onClose, onConfirm }: { expe
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>(documents.filter((item) => item.status !== 'missing').map((item) => item.id).slice(0, 2))
   const [summary, setSummary] = useState(`I want expert guidance on my ${profile.targetDegree} ${profile.subject} plan for ${profile.preferredIntake}. My preferred destinations are ${profile.preferredCountries.join(', ')}.`)
   const [consent, setConsent] = useState(false)
+  const [useCredit, setUseCredit] = useState(availableExpertCredits > 0)
   const service = expert.services.find((item) => item.id === serviceId) ?? expert.services[0]
   const availableDocuments = documents.filter((item) => item.status !== 'missing')
 
@@ -746,6 +771,7 @@ function BookingModal({ expert, profile, documents, onClose, onConfirm }: { expe
       caseSummary: summary,
       consent,
       status: 'confirmed',
+      usedExpertCredit: useCredit,
     })
   }
 
@@ -753,9 +779,9 @@ function BookingModal({ expert, profile, documents, onClose, onConfirm }: { expe
     <button className="modal-close" onClick={onClose}>×</button>
     <div className="booking-heading"><span className="eyebrow">Book consultation · Step {step} of 4</span><h2>{expert.name}</h2><div className="booking-stepper">{[1, 2, 3, 4].map((item) => <span className={item <= step ? 'active' : ''} key={item} />)}</div></div>
     {step === 1 && <div className="booking-content"><h3>Choose a service</h3><div className="service-choice">{expert.services.map((item) => <button className={serviceId === item.id ? 'selected' : ''} onClick={() => setServiceId(item.id)} key={item.id}><div><strong>{item.title}</strong><small>{item.durationMinutes} minutes · {item.description}</small></div><strong>{formatUsd(item.priceUsd, profile.preferredCurrency)}</strong></button>)}</div></div>}
-    {step === 2 && <div className="booking-content"><h3>Select a date and time</h3><div className="date-choice">{dates.map((item) => <button className={date === item ? 'selected' : ''} onClick={() => { setDate(item); setTime(expert.availability[item][0]) }} key={item}>{item}</button>)}</div><div className="time-choice">{expert.availability[date].map((item) => <button className={time === item ? 'selected' : ''} onClick={() => setTime(item)} key={item}>{item}</button>)}</div><small className="timezone-note">Times will be treated as {Intl.DateTimeFormat().resolvedOptions().timeZone} for this prototype.</small></div>}
+    {step === 2 && <div className="booking-content"><h3>Select a date and time</h3>{priorityAccess && <div className="priority-access">◆ Priority booking access enabled by your plan</div>}<div className="date-choice">{dates.map((item) => <button className={date === item ? 'selected' : ''} onClick={() => { setDate(item); setTime(expert.availability[item][0]) }} key={item}>{item}</button>)}</div><div className="time-choice">{expert.availability[date].map((item) => <button className={time === item ? 'selected' : ''} onClick={() => setTime(item)} key={item}>{item}</button>)}</div><small className="timezone-note">Times will be treated as {Intl.DateTimeFormat().resolvedOptions().timeZone} for this prototype.</small></div>}
     {step === 3 && <div className="booking-content"><h3>Prepare the expert case</h3><label className="case-summary">Case summary<textarea value={summary} onChange={(event) => setSummary(event.target.value)} /></label><span className="eyebrow">Documents to share</span>{availableDocuments.length ? <div className="share-documents">{availableDocuments.map((document) => <label key={document.id}><input type="checkbox" checked={selectedDocuments.includes(document.id)} onChange={() => setSelectedDocuments((current) => current.includes(document.id) ? current.filter((id) => id !== document.id) : [...current, document.id])} /><div><strong>{document.title}</strong><small>{document.files.length} file(s) · {document.status}</small></div></label>)}</div> : <p className="muted">No documents are available to share. You can still book the consultation.</p>}</div>}
-    {step === 4 && <div className="booking-content booking-review"><h3>Review and consent</h3><div className="review-grid"><div><small>Service</small><strong>{service.title}</strong></div><div><small>Price</small><strong>{formatUsd(service.priceUsd, profile.preferredCurrency)}</strong></div><div><small>Schedule</small><strong>{date} · {time}</strong></div><div><small>Documents</small><strong>{selectedDocuments.length} selected</strong></div></div><div className="case-preview"><small>Case summary</small><p>{summary}</p></div><label className="consent-box"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} /><span>I consent to sharing this case summary and the selected prototype document metadata with {expert.name} for this consultation. No actual file contents are transmitted in this prototype.</span></label></div>}
+    {step === 4 && <div className="booking-content booking-review"><h3>Review and consent</h3><div className="review-grid"><div><small>Service</small><strong>{service.title}</strong></div><div><small>Price</small><strong>{useCredit ? 'Included expert credit' : formatUsd(service.priceUsd, profile.preferredCurrency)}</strong></div><div><small>Schedule</small><strong>{date} · {time}</strong></div><div><small>Documents</small><strong>{selectedDocuments.length} selected</strong></div></div>{availableExpertCredits > 0 && <label className="credit-choice"><input type="checkbox" checked={useCredit} onChange={(event) => setUseCredit(event.target.checked)} /><span>Use one of my {availableExpertCredits} expert credit(s) for this booking.</span></label>}<div className="case-preview"><small>Case summary</small><p>{summary}</p></div><label className="consent-box"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} /><span>I consent to sharing this case summary and the selected prototype document metadata with {expert.name} for this consultation. No actual file contents are transmitted in this prototype.</span></label></div>}
     <div className="booking-actions"><button className="text-button" disabled={step === 1} onClick={() => setStep((value) => value - 1)}>← Back</button>{step < 4 ? <button className="primary" onClick={() => setStep((value) => value + 1)}>Continue →</button> : <button className="primary" disabled={!consent} onClick={confirm}>Confirm mock booking</button>}</div>
   </section></div>
 }
@@ -864,11 +890,13 @@ function Roadmap({ documents }: { documents: UserDocument[] }) {
   )
 }
 
-function Documents({ documents, onChange, onProfileUpdate, setView }: {
+function Documents({ documents, onChange, onProfileUpdate, setView, plan, onUpgrade }: {
   documents: UserDocument[]
   onChange: (documents: UserDocument[]) => void
   onProfileUpdate: (update: Partial<UserProfile>) => void
   setView: (view: View) => void
+  plan: SubscriptionPlan
+  onUpgrade: (feature: GatedFeature) => void
 }) {
   const [toast, setToast] = useState('')
   const [newFolderName, setNewFolderName] = useState('')
@@ -892,6 +920,14 @@ function Documents({ documents, onChange, onProfileUpdate, setView }: {
     setToast(`File removed from ${document.title}.`)
   }
   const addCustomFolder = () => {
+    if (!canUseFeature(plan.id, 'customDocumentFolders')) {
+      onUpgrade('customDocumentFolders')
+      return
+    }
+    if (documents.length >= plan.limits.documentFolders) {
+      onUpgrade('customDocumentFolders')
+      return
+    }
     const title = newFolderName.trim()
     if (!title) return
     onChange([...documents, {
@@ -932,7 +968,7 @@ function Documents({ documents, onChange, onProfileUpdate, setView }: {
           <div><span className="summary-dot missing-dot" /><strong>{documents.filter((item) => item.status === 'missing').length}</strong><small>Missing</small></div>
         </div>
         {sections.map((section) => <section className="document-section" key={section.id}>
-          <div className="document-section-head"><div><span className="eyebrow">{section.title}</span><h2>{section.description}</h2></div>{section.id === 'supporting' && <div className="custom-folder-form"><input value={newFolderName} onChange={(event) => setNewFolderName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') addCustomFolder() }} placeholder="New document folder name" /><button onClick={addCustomFolder}>Add folder</button></div>}</div>
+          <div className="document-section-head"><div><span className="eyebrow">{section.title}</span><h2>{section.description}</h2></div>{section.id === 'supporting' && (canUseFeature(plan.id, 'customDocumentFolders') ? <div className="custom-folder-form"><input value={newFolderName} onChange={(event) => setNewFolderName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') addCustomFolder() }} placeholder="New document folder name" /><button onClick={addCustomFolder}>Add folder</button></div> : <button className="locked-inline" onClick={() => onUpgrade('customDocumentFolders')}>⌁ Custom folders · {minimumPlanName('customDocumentFolders')}</button>)}</div>
           <div className="document-list">
           {documents.filter((document) => document.category === section.id).map((document) => <article className="document-card" key={document.id}>
             <div className={`document-icon ${document.status}`}>▤</div>
@@ -1025,6 +1061,10 @@ function App() {
 
   const openProgram = (program: Program) => { setSelectedProgram(program); setView('program') }
   const logout = () => { localStorage.removeItem('navigator-session'); setAuthenticated(false) }
+  const requestUpgrade = (feature: GatedFeature) => {
+    setView('subscription')
+    setAppToast(`${gatedFeatureLabels[feature]} is available on the ${minimumPlanName(feature)} plan.`)
+  }
   const toggleSaved = (id: string) => setSavedIds((current) => {
     if (current.includes(id)) return current.filter((item) => item !== id)
     if (current.length >= currentPlan.limits.shortlist) {
@@ -1052,25 +1092,34 @@ function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar view={view} setView={setView} onLogout={logout} documentCount={missingDocuments} />
+      <Sidebar view={view} setView={setView} onLogout={logout} documentCount={missingDocuments} planId={currentPlan.id} onLocked={requestUpgrade} />
       <main className="workspace">
         {appToast && <Toast message={appToast} onClose={() => setAppToast('')} />}
         {view === 'dashboard' && <Dashboard setView={setView} openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} profile={profile} scores={scores} notifications={notifications} plan={currentPlan} />}
         {view === 'study-plan' && <StudyPlan profile={profile} documents={normalizedDocuments} savedIds={savedIds} scores={scores} applications={applications} setApplications={setApplications} setView={setView} openProgram={openProgram} />}
         {view === 'explore' && <Explore openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} openCompare={() => setView('shortlist')} scores={scores} profile={profile} plan={currentPlan} />}
-        {view === 'program' && <ProgramDetail program={selectedProgram} score={scores[selectedProgram.id]} profile={profile} goBack={() => setView('explore')} goRoadmap={() => setView('roadmap')} saved={savedIds.includes(selectedProgram.id)} toggleSaved={() => toggleSaved(selectedProgram.id)} />}
+        {view === 'program' && <ProgramDetail program={selectedProgram} score={scores[selectedProgram.id]} profile={profile} goBack={() => setView('explore')} goRoadmap={() => canUseFeature(currentPlan.id, 'roadmap') ? setView('roadmap') : requestUpgrade('roadmap')} saved={savedIds.includes(selectedProgram.id)} toggleSaved={() => toggleSaved(selectedProgram.id)} advancedCosts={canUseFeature(currentPlan.id, 'advancedCosts')} onUpgrade={() => requestUpgrade('advancedCosts')} />}
         {view === 'shortlist' && <Shortlist savedIds={savedIds} compareIds={compareIds} openProgram={openProgram} toggleSaved={toggleSaved} toggleCompare={toggleCompare} scores={scores} profile={profile} plan={currentPlan} />}
         {view === 'scholarships' && <Scholarships openProgram={openProgram} />}
         {view === 'roadmap' && <Roadmap documents={normalizedDocuments} />}
-        {view === 'documents' && <Documents documents={normalizedDocuments} onChange={setDocuments} onProfileUpdate={(update) => { setProfile((current) => ({ ...current, ...update })); setAppToast('Profile readiness updated from document status.') }} setView={setView} />}
+        {view === 'documents' && <Documents documents={normalizedDocuments} onChange={setDocuments} onProfileUpdate={(update) => { setProfile((current) => ({ ...current, ...update })); setAppToast('Profile readiness updated from document status.') }} setView={setView} plan={currentPlan} onUpgrade={requestUpgrade} />}
         {view === 'adviser' && <Adviser plan={currentPlan} subscription={subscription} setSubscription={setSubscription} openPlans={() => setView('subscription')} />}
-        {view === 'experts' && <Experts profile={profile} documents={normalizedDocuments} bookings={bookings} setBookings={setBookings} />}
+        {view === 'experts' && <Experts profile={profile} documents={normalizedDocuments} bookings={bookings} setBookings={setBookings} plan={currentPlan} subscription={subscription} setSubscription={setSubscription} />}
         {view === 'subscription' && <Subscription profile={profile} subscription={subscription} setSubscription={setSubscription} savedCount={savedIds.length} documentFolderCount={normalizedDocuments.length} bookingCount={bookings.length} />}
         {view === 'profile' && <><Profile profile={profile} onSave={(updated) => { setProfile(updated); setAppToast('Profile saved. Guidance has been recalculated.') }} /><div className="reset-demo-wrap"><button className="reset-demo" onClick={resetDemo}>Reset all demo data</button></div></>}
       </main>
       <nav className="mobile-nav">
-        {([['dashboard', '⌂', 'Home'], ['study-plan', '◎', 'Plan'], ['explore', '⌕', 'Explore'], ['shortlist', '◇', 'Saved'], ['documents', '▤', 'Docs'], ['experts', '◉', 'Experts']] as [View, string, string][]).map(([id, icon, label]) =>
-          <button className={view === id || (view === 'program' && id === 'explore') ? 'active' : ''} onClick={() => setView(id)} key={id}><span>{icon}</span>{label}</button>)}
+        {([
+          ['dashboard', '⌂', 'Home'],
+          ['study-plan', '◎', 'Plan', 'studyPlan'],
+          ['explore', '⌕', 'Explore'],
+          ['shortlist', '◇', 'Saved', 'shortlist'],
+          ['documents', '▤', 'Docs', 'documents'],
+          ['experts', '◉', 'Experts', 'expertBooking'],
+        ] as [View, string, string, GatedFeature?][]).map(([id, icon, label, feature]) => {
+          const locked = Boolean(feature && !canUseFeature(currentPlan.id, feature))
+          return <button className={`${view === id || (view === 'program' && id === 'explore') ? 'active' : ''} ${locked ? 'locked' : ''}`} onClick={() => locked && feature ? requestUpgrade(feature) : setView(id)} key={id}><span>{icon}</span>{label}{locked && <em>⌁</em>}</button>
+        })}
       </nav>
     </div>
   )

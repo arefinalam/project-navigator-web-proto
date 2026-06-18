@@ -1,5 +1,45 @@
 import type { SubscriptionPlan } from '../types'
 
+export type GatedFeature =
+  | 'studyPlan'
+  | 'shortlist'
+  | 'scholarships'
+  | 'roadmap'
+  | 'documents'
+  | 'adviser'
+  | 'advancedCosts'
+  | 'customDocumentFolders'
+  | 'expertBooking'
+  | 'priorityExperts'
+
+export const featureMinimumPlan: Record<GatedFeature, SubscriptionPlan['id']> = {
+  studyPlan: 'essential',
+  shortlist: 'essential',
+  scholarships: 'essential',
+  roadmap: 'essential',
+  documents: 'free',
+  adviser: 'free',
+  advancedCosts: 'plus',
+  customDocumentFolders: 'plus',
+  expertBooking: 'essential',
+  priorityExperts: 'expert',
+}
+
+const planRank: Record<SubscriptionPlan['id'], number> = {
+  free: 0,
+  essential: 1,
+  plus: 2,
+  expert: 3,
+}
+
+export function canUseFeature(planId: SubscriptionPlan['id'], feature: GatedFeature) {
+  return planRank[planId] >= planRank[featureMinimumPlan[feature]]
+}
+
+export function minimumPlanName(feature: GatedFeature) {
+  return plans.find((plan) => plan.id === featureMinimumPlan[feature])?.name ?? 'a higher plan'
+}
+
 export const plans: SubscriptionPlan[] = [
   {
     id: 'free',
