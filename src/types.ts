@@ -9,6 +9,8 @@ export type View =
   | 'documents'
   | 'study-plan'
   | 'career-plan'
+  | 'job-preparation'
+  | 'job-search'
   | 'experts'
   | 'subscription'
   | 'profile'
@@ -94,6 +96,13 @@ export type UserProfile = {
   ieltsScore: number
   sponsorReady: boolean
   transcriptReady: boolean
+}
+
+export type ServiceType = 'study' | 'career' | 'job-preparation' | 'job-search'
+
+export type ServiceState = {
+  active: ServiceType[]
+  selected: ServiceType
 }
 
 export type ProgramScore = {
@@ -188,6 +197,42 @@ export type CareerProfile = {
   currentSkills: string[]
   targetRoleIds: string[]
   completedTasks: string[]
+}
+
+export type JobPreparationProfile = {
+  targetRoleId: string
+  cvSections: Record<'summary' | 'skills' | 'experience' | 'projects' | 'education' | 'achievements', boolean>
+  portfolioItems: {
+    id: string
+    title: string
+    type: 'project' | 'case-study' | 'writing' | 'presentation'
+    status: 'idea' | 'draft' | 'ready'
+  }[]
+  interviewConfidence: number
+  practiceSessions: number
+  completedTasks: string[]
+}
+
+export type JobListing = {
+  id: string
+  title: string
+  company: string
+  location: string
+  workMode: 'Remote' | 'Hybrid' | 'On-site'
+  level: string
+  roleId: string
+  salaryUsd: string
+  skills: string[]
+  postedAt: string
+  deadline: string
+}
+
+export type JobApplication = {
+  jobId: string
+  status: 'saved' | 'preparing' | 'applied' | 'interview' | 'offer' | 'closed'
+  appliedAt?: string
+  nextAction: string
+  notes: string
 }
 
 export type ApplicationStatus =

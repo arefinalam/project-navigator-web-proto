@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import programsData from './data/programs.json'
 import roadmapData from './data/roadmap.json'
 import scholarshipsData from './data/scholarships.json'
@@ -9,9 +9,11 @@ import { defaultDocuments } from './data/documents'
 import { studyPhases } from './data/studyPlan'
 import { experts } from './data/experts'
 import { careerRoles, careerTasks, defaultCareerProfile } from './data/careers'
+import { defaultJobPreparationProfile, interviewPrompts, jobPreparationTasks } from './data/jobPreparation'
+import { defaultJobApplications, jobs } from './data/jobs'
 import { canUseFeature, minimumPlanName, plans, type GatedFeature } from './data/plans'
 import { bdtToPreferred, buildNotifications, defaultProfile, estimateCost, formatPreferredCurrency, formatProfileCurrency, formatProfileDate, preferredToBdt, scoreProgram } from './lib/personalization'
-import type { ApplicationRecord, ApplicationStatus, AppNotification, CareerProfile, CareerRole, ChatMessage, ConsultationBooking, DocumentFile, Expert, Program, ProgramScore, RoadmapItem, Scholarship, StudyPhaseId, SubscriptionPlan, SubscriptionState, UserDocument, UserProfile, View } from './types'
+import type { ApplicationRecord, ApplicationStatus, AppNotification, CareerProfile, CareerRole, ChatMessage, ConsultationBooking, DocumentFile, Expert, JobApplication, JobPreparationProfile, Program, ProgramScore, RoadmapItem, Scholarship, ServiceState, ServiceType, StudyPhaseId, SubscriptionPlan, SubscriptionState, UserDocument, UserProfile, View } from './types'
 import './App.css'
 
 type AuthMode = 'login' | 'signup'
@@ -19,6 +21,57 @@ type AuthMode = 'login' | 'signup'
 const programs = programsData as Program[]
 const initialRoadmap = roadmapData as RoadmapItem[]
 const scholarships = scholarshipsData as Scholarship[]
+
+const serviceMeta: Record<ServiceType, { label: string, icon: string, view: View, description: string }> = {
+  study: { label: 'Study abroad', icon: '◎', view: 'study-plan', description: 'Programs, funding and applications' },
+  career: { label: 'Career planning', icon: '↗', view: 'career-plan', description: 'Direction, role fit and skill growth' },
+  'job-preparation': { label: 'Job preparation', icon: '▣', view: 'job-preparation', description: 'CV, evidence and interviews' },
+  'job-search': { label: 'Job search', icon: '⌕', view: 'job-search', description: 'Opportunities and applications' },
+}
+
+function serviceFromGoal(goal: string): ServiceType {
+  if (goal === 'Career planning') return 'career'
+  if (goal === 'Job preparation') return 'job-preparation'
+  if (goal === 'Job search') return 'job-search'
+  return 'study'
+}
+
+const bn: Record<string, string> = {
+  Overview: 'সারসংক্ষেপ', 'Study plan': 'স্টাডি প্ল্যান', 'Career plan': 'ক্যারিয়ার প্ল্যান',
+  'Job preparation': 'চাকরির প্রস্তুতি', 'Job search': 'চাকরি খোঁজা', Documents: 'ডকুমেন্টস',
+  'Ask Navigator': 'নেভিগেটরকে জিজ্ঞাসা', 'Expert consultations': 'বিশেষজ্ঞ পরামর্শ',
+  'Plans & usage': 'প্ল্যান ও ব্যবহার', 'My profile': 'আমার প্রোফাইল', 'Log out': 'লগ আউট',
+  Scholarships: 'স্কলারশিপ', 'My roadmap': 'আমার রোডম্যাপ', 'Explore programs': 'প্রোগ্রাম খুঁজুন',
+  'Shortlist & comparison': 'শর্টলিস্ট ও তুলনা', 'Document center': 'ডকুমেন্ট সেন্টার',
+}
+
+function translate(profile: UserProfile, text: string) {
+  return profile.interfaceLanguage === 'bn' ? (bn[text] ?? text) : text
+}
+
+function useAccessibleModal(onClose: () => void) {
+  const ref = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const modal = ref.current
+    if (!modal) return
+    const previous = document.activeElement as HTMLElement | null
+    const focusable = () => [...modal.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href]')]
+    focusable()[0]?.focus()
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+      if (event.key !== 'Tab') return
+      const items = focusable()
+      if (!items.length) return
+      const first = items[0]
+      const last = items[items.length - 1]
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+    }
+    document.addEventListener('keydown', keydown)
+    return () => { document.removeEventListener('keydown', keydown); previous?.focus() }
+  }, [onClose])
+  return ref
+}
 
 function normalizeDocuments(saved: UserDocument[]) {
   const normalized = defaultDocuments.map((template) => {
@@ -52,14 +105,14 @@ function PublicLanding({ onStart, onDemo }: { onStart: () => void, onDemo: () =>
   return <main className="landing-page">
     <header className="landing-nav"><Logo /><nav aria-label="Public navigation"><a href="#how-it-works">How it works</a><a href="#features">Features</a><a href="#plans">Plans</a></nav><div><button className="text-button" onClick={onStart}>Log in</button><button className="primary small" onClick={onStart}>Build my plan</button></div></header>
     <section className="landing-hero">
-      <div><span className="eyebrow">Study decisions, made navigable</span><h1>A personal route from “maybe” to <em>ready.</em></h1><p>Compare realistic study options, understand costs, organize applications, and bring in expert help—without losing the thread of your plan.</p><div className="landing-actions"><button className="primary" onClick={onStart}>Create my guidance profile →</button><button className="secondary" onClick={onDemo}>Explore the demo</button></div><small>No payment required · Prototype data stays in this browser</small></div>
+      <div><span className="eyebrow">Important decisions, made navigable</span><h1>A personal route from “maybe” to <em>ready.</em></h1><p>Plan study, career and job goals, build evidence, track applications, and bring in expert help—without losing the thread.</p><div className="landing-actions"><button className="primary" onClick={onStart}>Create my guidance profile →</button><button className="secondary" onClick={onDemo}>Explore the demo</button></div><small>No payment required · Prototype data stays in this browser</small></div>
       <div className="landing-preview" aria-label="Product preview"><div className="preview-head"><span>Samira’s study plan</span><strong>74% ready</strong></div><div className="preview-route"><span className="done">✓</span><div><strong>Profile and goals</strong><small>Complete</small></div></div><div className="preview-route"><span className="active">2</span><div><strong>Research and shortlist</strong><small>3 strong programme matches</small></div></div><div className="preview-route"><span>3</span><div><strong>Tests and documents</strong><small>IELTS is the next priority</small></div></div><div className="preview-match"><small>Strongest current match</small><strong>Technical University of Munich</strong><span>88% profile fit · budget needs funding</span></div></div>
     </section>
     <section className="landing-proof"><span>One connected workspace for</span><div><strong>Programme discovery</strong><strong>Funding strategy</strong><strong>Application tracking</strong><strong>Expert review</strong></div></section>
     <section className="landing-section" id="how-it-works"><span className="eyebrow">How it works</span><h2>Guidance that changes when your reality changes.</h2><div className="landing-steps">{[['01','Map your profile','Add your academic background, budget, destinations and target intake.'],['02','See the trade-offs','Compare fit, funding pressure, readiness gaps and practical next steps.'],['03','Follow one plan','Track documents, applications, expert reviews, visa and departure work.']].map(([number,title,text]) => <article key={number}><span>{number}</span><h3>{title}</h3><p>{text}</p></article>)}</div></section>
     <section className="landing-section landing-features" id="features"><div><span className="eyebrow light">Built for consequential choices</span><h2>More than a list of universities.</h2><p>Navigator connects recommendations to the work required to make them possible.</p></div><div className="feature-list"><article><span>✦</span><strong>Profile-aware matching</strong><p>Recommendations recalculate around academics, budget, destinations and readiness.</p></article><article><span>◇</span><strong>Application workspace</strong><p>Move from shortlist to documents, funding, submission, visa and departure.</p></article><article><span>◎</span><strong>Human review when needed</strong><p>Prepare a structured case and selectively share it with an expert.</p></article></div></section>
     <section className="landing-cta" id="plans"><span className="eyebrow">Start with the free discovery plan</span><h2>Your next decision should feel smaller than your whole future.</h2><button className="primary" onClick={onStart}>Start building my plan →</button></section>
-    <footer className="landing-footer"><Logo /><span>Global study guidance prototype · 2026</span></footer>
+    <footer className="landing-footer"><Logo /><span>Global study, career and job guidance prototype · 2026</span></footer>
   </main>
 }
 
@@ -159,19 +212,19 @@ function Onboarding({ profile, onComplete }: { profile: UserProfile, onComplete:
             <h1>What would you like help with?</h1>
             <p className="muted">Choose your primary goal. You can add more services later.</p>
             <div className="choice-grid">
-              {['Study abroad', 'Career planning', 'Job preparation', 'Expert opinion'].map((item) =>
+              {['Study abroad', 'Career planning', 'Job preparation', 'Job search'].map((item) =>
                 <button className={draft.goal === item ? 'selected' : ''} onClick={() => setDraft({ ...draft, goal: item })} key={item}>
-                  <span className="choice-icon">{item === 'Study abroad' ? '✦' : item === 'Career planning' ? '⌁' : item === 'Job preparation' ? '◫' : '◎'}</span>
-                  <strong>{item}</strong><small>{item === 'Study abroad' ? 'Programs, funding and applications' : item === 'Career planning' ? 'Find a direction that fits' : item === 'Job preparation' ? 'CV, skills and interviews' : 'Review with a specialist'}</small>
+                  <span className="choice-icon">{item === 'Study abroad' ? '✦' : item === 'Career planning' ? '⌁' : item === 'Job preparation' ? '◫' : '⌕'}</span>
+                  <strong>{item}</strong><small>{item === 'Study abroad' ? 'Programs, funding and applications' : item === 'Career planning' ? 'Find a direction that fits' : item === 'Job preparation' ? 'CV, skills and interviews' : 'Find roles and track applications'}</small>
                 </button>)}
             </div>
           </>}
           {step === 2 && <>
-            <span className="eyebrow">Your academic direction</span>
-            <h1>What do you want to study?</h1>
+            <span className="eyebrow">{draft.goal === 'Study abroad' ? 'Your academic direction' : 'Your current background'}</span>
+            <h1>{draft.goal === 'Study abroad' ? 'What do you want to study?' : 'What experience are you bringing?'}</h1>
             <div className="field-grid">
-              <label>Target degree<select value={draft.targetDegree} onChange={(e) => setDraft({ ...draft, targetDegree: e.target.value })}><option>Master’s</option><option>Bachelor’s</option><option>PhD</option></select></label>
-              <Autocomplete label="Subject area" value={draft.subject} options={subjects} onChange={(subject) => setDraft({ ...draft, subject })} placeholder="Start typing a subject" />
+              <label>{draft.goal === 'Study abroad' ? 'Target degree' : 'Highest/current degree'}<select value={draft.targetDegree} onChange={(e) => setDraft({ ...draft, targetDegree: e.target.value })}><option>Master’s</option><option>Bachelor’s</option><option>PhD</option></select></label>
+              <Autocomplete label={draft.goal === 'Study abroad' ? 'Subject area' : 'Background area'} value={draft.subject} options={subjects} onChange={(subject) => setDraft({ ...draft, subject })} placeholder="Start typing a subject" />
               <label>Current CGPA<input type="number" min="0" max="4" step=".01" value={draft.cgpa} onChange={(e) => setDraft({ ...draft, cgpa: Number(e.target.value) })} /></label>
               <label>Graduation year<input type="number" value={draft.graduationYear} onChange={(e) => setDraft({ ...draft, graduationYear: Number(e.target.value) })} /></label>
             </div>
@@ -185,7 +238,7 @@ function Onboarding({ profile, onComplete }: { profile: UserProfile, onComplete:
               <label>Annual budget ({draft.preferredCurrency})<input type="number" step="1000" value={bdtToPreferred(draft.annualBudgetBdt, draft.preferredCurrency)} onChange={(e) => setDraft({ ...draft, annualBudgetBdt: preferredToBdt(Number(e.target.value), draft.preferredCurrency) })} /></label>
               <MultiAutocomplete label="Preferred destinations" values={draft.preferredCountries} options={countries} onChange={(preferredCountries) => setDraft({ ...draft, preferredCountries })} />
               <label>English test<select value={draft.ieltsStatus} onChange={(e) => setDraft({ ...draft, ieltsStatus: e.target.value as UserProfile['ieltsStatus'] })}><option value="planning">Planning IELTS</option><option value="completed">IELTS completed</option><option value="not-planned">Not planned</option></select></label>
-              <label>Interface language<select value={draft.interfaceLanguage} onChange={(e) => setDraft({ ...draft, interfaceLanguage: e.target.value as UserProfile['interfaceLanguage'] })}><option value="en">English</option><option value="bn">বাংলা (Bangla preview)</option></select></label>
+              <label>Interface language<select value={draft.interfaceLanguage} onChange={(e) => setDraft({ ...draft, interfaceLanguage: e.target.value as UserProfile['interfaceLanguage'] })}><option value="en">English</option><option value="bn">বাংলা</option></select></label>
               <label>Timezone<select value={draft.timezone} onChange={(e) => setDraft({ ...draft, timezone: e.target.value })}>{timezones.map((timezone) => <option key={timezone}>{timezone}</option>)}</select></label>
             </div>
           </>}
@@ -201,16 +254,19 @@ function Onboarding({ profile, onComplete }: { profile: UserProfile, onComplete:
   )
 }
 
-function Sidebar({ view, setView, onLogout, documentCount, planId, onLocked }: { view: View, setView: (view: View) => void, onLogout: () => void, documentCount: number, planId: SubscriptionPlan['id'], onLocked: (feature: GatedFeature) => void }) {
+function Sidebar({ view, setView, onLogout, documentCount, planId, onLocked, profile, services, onServiceChange }: { view: View, setView: (view: View) => void, onLogout: () => void, documentCount: number, planId: SubscriptionPlan['id'], onLocked: (feature: GatedFeature) => void, profile: UserProfile, services: ServiceState, onServiceChange: (service: ServiceType) => void }) {
   const planName = plans.find((plan) => plan.id === planId)?.name ?? 'Discovery'
-  const links: { id: View, label: string, icon: string, feature?: GatedFeature }[] = [
+  const initials = profile.fullName.split(' ').map((item) => item[0]).slice(0, 2).join('').toUpperCase()
+  const links: { id: View, label: string, icon: string, feature?: GatedFeature, service?: ServiceType }[] = [
     { id: 'dashboard', label: 'Overview', icon: '⌂' },
-    { id: 'study-plan', label: 'Study plan', icon: '◎', feature: 'studyPlan' },
-    { id: 'career-plan', label: 'Career plan', icon: '↗', feature: 'careerPlan' },
-    { id: 'explore', label: 'Explore programs', icon: '⌕' },
-    { id: 'shortlist', label: 'Shortlist & compare', icon: '◇', feature: 'shortlist' },
-    { id: 'scholarships', label: 'Scholarships', icon: '$', feature: 'scholarships' },
-    { id: 'roadmap', label: 'My roadmap', icon: '✓', feature: 'roadmap' },
+    { id: 'study-plan', label: 'Study plan', icon: '◎', feature: 'studyPlan', service: 'study' },
+    { id: 'explore', label: 'Explore programs', icon: '⌕', service: 'study' },
+    { id: 'shortlist', label: 'Shortlist & compare', icon: '◇', feature: 'shortlist', service: 'study' },
+    { id: 'scholarships', label: 'Scholarships', icon: '$', feature: 'scholarships', service: 'study' },
+    { id: 'roadmap', label: 'My roadmap', icon: '✓', feature: 'roadmap', service: 'study' },
+    { id: 'career-plan', label: 'Career plan', icon: '↗', feature: 'careerPlan', service: 'career' },
+    { id: 'job-preparation', label: 'Job preparation', icon: '▣', feature: 'jobPreparation', service: 'job-preparation' },
+    { id: 'job-search', label: 'Job search', icon: '⌕', feature: 'jobSearch', service: 'job-search' },
     { id: 'documents', label: 'Documents', icon: '▤', feature: 'documents' },
     { id: 'adviser', label: 'Ask Navigator', icon: '✦', feature: 'adviser' },
     { id: 'experts', label: 'Expert consultations', icon: '◉', feature: 'expertBooking' },
@@ -220,16 +276,17 @@ function Sidebar({ view, setView, onLogout, documentCount, planId, onLocked }: {
   return (
     <aside className="sidebar">
       <Logo />
+      <label className="service-switcher"><span>{translate(profile, 'Workspace')}</span><select value={services.selected} onChange={(event) => onServiceChange(event.target.value as ServiceType)}>{services.active.map((service) => <option value={service} key={service}>{serviceMeta[service].label}</option>)}</select></label>
       <nav>
-        <span className="nav-label">Workspace</span>
-        {links.map((link) => {
+        <span className="nav-label">{translate(profile, 'Workspace')}</span>
+        {links.filter((link) => !link.service || link.service === services.selected).map((link) => {
           const locked = Boolean(link.feature && !canUseFeature(planId, link.feature))
-          return <button key={link.id} className={`${view === link.id || (view === 'program' && link.id === 'explore') ? 'active' : ''} ${locked ? 'locked-nav' : ''}`} onClick={() => locked && link.feature ? onLocked(link.feature) : setView(link.id)}><span>{link.icon}</span>{link.label}{locked && <em className="lock-badge">⌁</em>}{link.id === 'documents' && !locked && documentCount > 0 && <em className="nav-badge">{documentCount}</em>}</button>
+          return <button key={link.id} className={`${view === link.id || (view === 'program' && link.id === 'explore') ? 'active' : ''} ${locked ? 'locked-nav' : ''}`} onClick={() => locked && link.feature ? onLocked(link.feature) : setView(link.id)}><span>{link.icon}</span>{translate(profile, link.label)}{locked && <em className="lock-badge">⌁</em>}{link.id === 'documents' && !locked && documentCount > 0 && <em className="nav-badge">{documentCount}</em>}</button>
         })}
       </nav>
       <div className="sidebar-bottom">
-        <div className="mini-profile"><span>SR</span><div><strong>Samira Rahman</strong><small>{planName} plan</small></div></div>
-        <button className="logout" onClick={onLogout}>Log out</button>
+        <div className="mini-profile"><span>{initials}</span><div><strong>{profile.fullName}</strong><small>{planName} plan</small></div></div>
+        <button className="logout" onClick={onLogout}>{translate(profile, 'Log out')}</button>
       </div>
     </aside>
   )
@@ -237,7 +294,12 @@ function Sidebar({ view, setView, onLogout, documentCount, planId, onLocked }: {
 
 function Topbar({ title, notifications = [], onNotification }: { title: string, notifications?: AppNotification[], onNotification?: (item: AppNotification) => void }) {
   const [open, setOpen] = useState(false)
-  return <header className="topbar"><div><span className="mobile-logo"><Logo /></span><h1>{title}</h1></div><div className="top-actions"><button aria-label="Notifications" aria-expanded={open} onClick={() => setOpen((value) => !value)}>♢{notifications.length > 0 && <span className="notification-dot" />}</button><div className="avatar" aria-label="Samira Rahman">SR</div>{open && <div className="notification-menu"><div className="notification-title"><strong>Notifications</strong><span>{notifications.length} new</span></div>{notifications.length ? notifications.map((item) => <button className="notification-item" key={item.id} onClick={() => { onNotification?.(item); setOpen(false) }}><span className={`notice-icon ${item.type}`}>{item.type === 'funding' ? '$' : item.type === 'deadline' ? '!' : item.type === 'profile' ? '○' : '✦'}</span><div><strong>{item.title}</strong><small>{item.detail}</small></div></button>) : <div className="notification-empty"><span>✓</span><strong>You’re caught up</strong><small>New guidance alerts will appear here.</small></div>}</div>}</div></header>
+  const savedProfile = JSON.parse(localStorage.getItem('navigator-profile') || '{}') as Partial<UserProfile>
+  const savedSession = JSON.parse(localStorage.getItem('navigator-session') || '{}') as { name?: string }
+  const name = savedProfile.fullName || savedSession.name || 'User'
+  const initials = name.split(' ').map((item) => item[0]).slice(0, 2).join('').toUpperCase()
+  const displayTitle = savedProfile.interfaceLanguage === 'bn' ? (bn[title] ?? title) : title
+  return <header className="topbar"><div><span className="mobile-logo"><Logo /></span><h1>{displayTitle}</h1></div><div className="top-actions"><button aria-label="Notifications" aria-expanded={open} onClick={() => setOpen((value) => !value)}>♢{notifications.length > 0 && <span className="notification-dot" />}</button><div className="avatar" aria-label={name}>{initials}</div>{open && <div className="notification-menu"><div className="notification-title"><strong>Notifications</strong><span>{notifications.length} new</span></div>{notifications.length ? notifications.map((item) => <button className="notification-item" key={item.id} onClick={() => { onNotification?.(item); setOpen(false) }}><span className={`notice-icon ${item.type}`}>{item.type === 'funding' ? '$' : item.type === 'deadline' ? '!' : item.type === 'profile' ? '○' : '✦'}</span><div><strong>{item.title}</strong><small>{item.detail}</small></div></button>) : <div className="notification-empty"><span>✓</span><strong>You’re caught up</strong><small>New guidance alerts will appear here.</small></div>}</div>}</div></header>
 }
 
 function ProgramCard({ program, score, profile, onOpen, saved, compared, onSave, onCompare, saveDisabled = false, compareDisabled = false }: {
@@ -279,7 +341,7 @@ function ProgramCard({ program, score, profile, onOpen, saved, compared, onSave,
   )
 }
 
-function Dashboard({ setView, openProgram, savedIds, compareIds, toggleSaved, toggleCompare, profile, scores, notifications, plan }: {
+function Dashboard({ setView, openProgram, savedIds, compareIds, toggleSaved, toggleCompare, profile, scores, notifications, plan, services, onSelectService, onAddService, career, preparation, jobApplications }: {
   setView: (view: View) => void
   openProgram: (program: Program) => void
   savedIds: string[]
@@ -290,41 +352,63 @@ function Dashboard({ setView, openProgram, savedIds, compareIds, toggleSaved, to
   scores: Record<string, ProgramScore>
   notifications: AppNotification[]
   plan: SubscriptionPlan
+  services: ServiceState
+  onSelectService: (service: ServiceType) => void
+  onAddService: (service: ServiceType) => void
+  career: CareerProfile
+  preparation: JobPreparationProfile
+  jobApplications: JobApplication[]
 }) {
   const topPrograms = [...programs].sort((a, b) => scores[b.id].overall - scores[a.id].overall).slice(0, 3)
   const readiness = Math.round((profile.cgpa / 4 * 35) + (profile.ieltsStatus === 'completed' ? 30 : profile.ieltsStatus === 'planning' ? 18 : 5) + (profile.transcriptReady ? 20 : 8) + (profile.sponsorReady ? 15 : 7))
+  const careerRole = careerRoles.find((role) => career.targetRoleIds.includes(role.id)) ?? careerRoles[0]
+  const cvReady = Math.round(Object.values(preparation.cvSections).filter(Boolean).length / 6 * 100)
+  const serviceContent = {
+    study: { readiness, label: 'Application readiness', title: 'Build a realistic study-abroad route.', text: 'Your profile shapes programme matches, costs, funding and next actions.', action: 'Create or update your IELTS plan', actionText: 'Complete the next academic-readiness task before applications.', actionView: 'roadmap' as View },
+    career: { readiness: Math.round((career.targetRoleIds.length / 3 * 35) + (career.currentSkills.length / 10 * 30) + (career.completedTasks.length / careerTasks.length * 35)), label: 'Career direction readiness', title: 'Turn career ideas into evidence.', text: `Your current primary direction is ${careerRole.title}.`, action: 'Validate your priority skill gap', actionText: 'Choose the next skill and connect it to a project or work example.', actionView: 'career-plan' as View },
+    'job-preparation': { readiness: Math.round(cvReady * .45 + preparation.interviewConfidence * .3 + preparation.completedTasks.length / jobPreparationTasks.length * 25), label: 'Candidate readiness', title: 'Prepare before applications become urgent.', text: `Your materials are currently tailored for ${careerRoles.find((role) => role.id === preparation.targetRoleId)?.title ?? careerRole.title}.`, action: 'Strengthen one evidence gap', actionText: 'Improve a CV section, portfolio item or interview story today.', actionView: 'job-preparation' as View },
+    'job-search': { readiness: Math.min(100, 25 + jobApplications.length * 15), label: 'Search momentum', title: 'Run a focused, trackable job search.', text: 'Match opportunities to your chosen role and keep every next action visible.', action: 'Review matched opportunities', actionText: 'Save a relevant role or progress an active application.', actionView: 'job-search' as View },
+  }[services.selected]
+  const upcoming = services.selected === 'study'
+    ? [['25', 'JUN', 'IELTS plan'], ['02', 'JUL', 'Scholarship review'], ['15', 'JUL', 'Transcript verification']]
+    : services.selected === 'career'
+      ? [['24', 'JUN', 'Skill evidence'], ['29', 'JUN', 'Career conversation'], ['05', 'JUL', 'Direction review']]
+      : services.selected === 'job-preparation'
+        ? [['23', 'JUN', 'CV evidence'], ['27', 'JUN', 'Interview practice'], ['03', 'JUL', 'Portfolio review']]
+        : [['22', 'JUN', 'Review saved jobs'], ['26', 'JUN', 'Tailor application'], ['01', 'JUL', 'Follow-up review']]
   return (
     <>
       <Topbar title="Overview" notifications={notifications} onNotification={(item) => setView(item.action)} />
       <div className="page-content">
         <section className="welcome-banner">
-          <div><span className="eyebrow light">Personalized guidance</span><h2>Good afternoon, {profile.fullName.split(' ')[0]}.</h2><p>Your profile now shapes every match, cost estimate and next action.</p></div>
-          <div className="readiness"><div className="large-ring" style={{ background: `conic-gradient(#79d9cc 0 ${readiness}%,rgba(255,255,255,.16) ${readiness}%)` }}><span>{readiness}%</span></div><div><strong>Application readiness</strong><small>Calculated from your profile</small></div></div>
+          <div><span className="eyebrow light">{serviceMeta[services.selected].label}</span><h2>{serviceContent.title}</h2><p>{serviceContent.text}</p></div>
+          <div className="readiness"><div className="large-ring" style={{ background: `conic-gradient(#79d9cc 0 ${serviceContent.readiness}%,rgba(255,255,255,.16) ${serviceContent.readiness}%)` }}><span>{serviceContent.readiness}%</span></div><div><strong>{serviceContent.label}</strong><small>Calculated from saved progress</small></div></div>
         </section>
 
+        <div className="service-tabs">{services.active.map((service) => <button className={services.selected === service ? 'active' : ''} onClick={() => onSelectService(service)} key={service}><span>{serviceMeta[service].icon}</span><div><strong>{serviceMeta[service].label}</strong><small>{serviceMeta[service].description}</small></div></button>)}{Object.keys(serviceMeta).filter((service) => !services.active.includes(service as ServiceType)).map((service) => <button className="add-service" onClick={() => onAddService(service as ServiceType)} key={service}><span>+</span><div><strong>Add {serviceMeta[service as ServiceType].label}</strong><small>{services.active.length}/{plan.limits.activeGoals} active-service limit</small></div></button>)}</div>
+
         <div className="stat-grid">
-          <div className="stat-card"><span className="stat-icon blue">✦</span><div><strong>{programs.filter((program) => scores[program.id].overall >= 75).length}</strong><small>Strong program matches</small></div><em>Dynamic</em></div>
-          <div className="stat-card"><span className="stat-icon green">✓</span><div><strong>7 / 18</strong><small>Roadmap tasks complete</small></div><em>On track</em></div>
-          <div className="stat-card"><span className="stat-icon amber">◷</span><div><strong>3</strong><small>Upcoming deadlines</small></div><em>Next: 25 Jun</em></div>
+          <div className="stat-card"><span className="stat-icon blue">✦</span><div><strong>{services.selected === 'study' ? programs.filter((program) => scores[program.id].overall >= 75).length : services.selected === 'career' ? career.targetRoleIds.length : services.selected === 'job-preparation' ? Object.values(preparation.cvSections).filter(Boolean).length : jobs.length}</strong><small>{services.selected === 'study' ? 'Strong programme matches' : services.selected === 'career' ? 'Target career roles' : services.selected === 'job-preparation' ? 'CV sections ready' : 'Matched opportunities'}</small></div><em>Dynamic</em></div>
+          <div className="stat-card"><span className="stat-icon green">✓</span><div><strong>{services.selected === 'career' ? `${career.completedTasks.length}/${careerTasks.length}` : services.selected === 'job-preparation' ? `${preparation.completedTasks.length}/${jobPreparationTasks.length}` : services.selected === 'job-search' ? jobApplications.length : savedIds.length}</strong><small>{services.selected === 'study' ? 'Saved programmes' : services.selected === 'job-search' ? 'Tracked applications' : 'Roadmap tasks complete'}</small></div><em>On track</em></div>
+          <div className="stat-card"><span className="stat-icon amber">◷</span><div><strong>{upcoming.length}</strong><small>Upcoming actions</small></div><em>Next: {upcoming[0][0]} Jun</em></div>
         </div>
 
         <div className="dashboard-grid">
           <section className="panel next-action">
-            <div className="section-title"><div><span className="eyebrow">Priority</span><h2>Your next best action</h2></div><span className="due-pill">Due in 7 days</span></div>
-            <div className="action-body"><span className="action-number">01</span><div><h3>Create your IELTS study plan</h3><p>A target score of 7.0 will keep all 12 matched programs open. Start with a diagnostic test, then plan six weeks of preparation.</p><div className="progress"><span style={{ width: '35%' }} /></div><small>2 of 5 preparation steps completed</small></div></div>
-            <button className="primary" onClick={() => setView('roadmap')}>Continue task →</button>
+            <div className="section-title"><div><span className="eyebrow">Priority</span><h2>Your next best action</h2></div><span className="due-pill">This week</span></div>
+            <div className="action-body"><span className="action-number">01</span><div><h3>{serviceContent.action}</h3><p>{serviceContent.actionText}</p><div className="progress"><span style={{ width: `${serviceContent.readiness}%` }} /></div><small>{serviceContent.readiness}% readiness</small></div></div>
+            <button className="primary" onClick={() => setView(serviceContent.actionView)}>Continue task →</button>
           </section>
           <section className="panel deadline-panel">
-            <div className="section-title"><div><span className="eyebrow">Calendar</span><h2>Coming up</h2></div><button className="text-button">View all</button></div>
-            {[['25', 'JUN', 'IELTS plan', 'Personal task'], ['02', 'JUL', 'Aalto scholarship', 'Funding deadline'], ['15', 'JUL', 'Transcript verification', 'Document task']].map((item) =>
-              <div className="deadline-row" key={item[2]}><div className="date-box"><strong>{item[0]}</strong><small>{item[1]}</small></div><div><strong>{item[2]}</strong><small>{item[3]}</small></div><span>›</span></div>)}
+            <div className="section-title"><div><span className="eyebrow">Calendar</span><h2>Coming up</h2></div><button className="text-button" onClick={() => setView(serviceContent.actionView)}>View all</button></div>
+            {upcoming.map((item) => <button className="deadline-row deadline-button" onClick={() => setView(serviceContent.actionView)} key={item[2]}><div className="date-box"><strong>{item[0]}</strong><small>{item[1]}</small></div><div><strong>{item[2]}</strong><small>Planned action</small></div><span>›</span></button>)}
           </section>
         </div>
 
-        <section className="recommend-section">
+        {services.selected === 'study' && <section className="recommend-section">
           <div className="section-title"><div><span className="eyebrow">Recommended for you</span><h2>Your strongest program matches</h2></div><button className="text-button" onClick={() => setView('explore')}>Explore all programs →</button></div>
           <div className="program-grid">{topPrograms.map((program) => <ProgramCard key={program.id} program={program} score={scores[program.id]} profile={profile} onOpen={() => openProgram(program)} saved={savedIds.includes(program.id)} compared={compareIds.includes(program.id)} saveDisabled={savedIds.length >= plan.limits.shortlist} compareDisabled={compareIds.length >= plan.limits.comparisons} onSave={() => toggleSaved(program.id)} onCompare={() => toggleCompare(program.id)} />)}</div>
-        </section>
+        </section>}
       </div>
     </>
   )
@@ -461,15 +545,30 @@ const adviserReplies = [
     match: ['shortlist', 'program', 'university'],
     text: 'A balanced five-program shortlist for you would include two ambitious options, two realistic targets and one financially safe option. At the moment, TUM and Aalto are strong targets while Saarland is the clearest cost-safe choice.',
     sources: ['Your profile', 'Program match scores']
+  },
+  {
+    match: ['career', 'role', 'direction', 'skill gap'],
+    text: 'Start with one primary role and one adjacent alternative. Compare the required skills against evidence you already have, then choose the smallest project or conversation that can test your assumptions.',
+    sources: ['Career Plan', 'Target-role skill map']
+  },
+  {
+    match: ['cv', 'resume', 'interview', 'portfolio'],
+    text: 'Tailor your CV and evidence to one target role. Prioritize measurable project outcomes, prepare six behavioral stories, and practice the actual interview format rather than generic questions.',
+    sources: ['Job Preparation', 'Portfolio evidence']
+  },
+  {
+    match: ['job', 'application', 'search', 'follow up'],
+    text: 'Use a focused search: save only roles aligned with your target direction, tailor the strongest evidence, record a next action, and review applications weekly instead of sending high-volume generic submissions.',
+    sources: ['Job Search tracker', 'Career targets']
   }
 ]
 
-function Adviser({ plan, subscription, setSubscription, openPlans }: { plan: SubscriptionPlan, subscription: SubscriptionState, setSubscription: React.Dispatch<React.SetStateAction<SubscriptionState>>, openPlans: () => void }) {
+function Adviser({ plan, subscription, setSubscription, openPlans, activeService, profile }: { plan: SubscriptionPlan, subscription: SubscriptionState, setSubscription: React.Dispatch<React.SetStateAction<SubscriptionState>>, openPlans: () => void, activeService: ServiceType, profile: UserProfile }) {
   const [input, setInput] = useState('')
   const [messages, setMessages] = usePersistentState<ChatMessage[]>('navigator-chat', [{
     id: 1,
     role: 'assistant',
-    text: 'Hi Samira. I can help you think through your program matches, funding plan, IELTS preparation and roadmap. What decision are you working on?',
+    text: `Hi ${profile.fullName.split(' ')[0]}. I can help with your ${serviceMeta[activeService].label.toLowerCase()} goal using the information saved in this prototype. What decision are you working on?`,
     sources: ['Your profile', 'Prototype guidance data']
   }])
 
@@ -481,22 +580,30 @@ function Adviser({ plan, subscription, setSubscription, openPlans }: { plan: Sub
     const text = (question ?? input).trim()
     if (!text) return
     const lower = text.toLowerCase()
-    const response = adviserReplies.find((reply) => reply.match.some((keyword) => lower.includes(keyword))) ?? {
-      text: 'Based on your current profile, the best next step is to complete the IELTS diagnostic and compare your three strongest programs. That will expose both academic and affordability gaps before you invest time in documents.',
-      sources: ['Your roadmap', 'Current match scores']
-    }
+    const response = adviserReplies.find((reply) => reply.match.some((keyword) => lower.includes(keyword))) ?? ({
+      study: { text: 'Complete the next study-readiness task and compare your strongest programmes before investing more time in applications.', sources: ['Study Plan', 'Current match scores'] },
+      career: { text: 'Clarify one target role, identify the highest-impact skill gap, and test it with evidence or a practitioner conversation.', sources: ['Career Plan', 'Role-fit analysis'] },
+      'job-preparation': { text: 'Strengthen the weakest of CV evidence, portfolio proof or interview practice before starting a larger application push.', sources: ['Job Preparation', 'Readiness scores'] },
+      'job-search': { text: 'Review tracked opportunities, progress one next action, and remove roles that no longer fit your target direction.', sources: ['Job Search', 'Application tracker'] },
+    }[activeService])
     setMessages((current) => [...current, { id: Date.now(), role: 'user', text }, { id: Date.now() + 1, role: 'assistant', text: response.text, sources: response.sources }])
     setSubscription((current) => ({ ...current, usage: { ...current.usage, adviserMessages: current.usage.adviserMessages + 1 } }))
     setInput('')
   }
 
+  const suggestions: Record<ServiceType, string[]> = {
+    study: ['Which country fits my budget?', 'How should I prepare for IELTS?', 'Help me build a balanced shortlist', 'What funding should I prioritize?'],
+    career: ['Which role fits my strengths?', 'What skill gap should I prioritize?', 'How can I test a career direction?', 'Help me build a career story'],
+    'job-preparation': ['How should I improve my CV?', 'Give me an interview practice plan', 'What belongs in my portfolio?', 'How do I show measurable impact?'],
+    'job-search': ['How should I focus my job search?', 'When should I follow up?', 'How do I tailor an application?', 'Which roles should I avoid?'],
+  }
   return (
     <>
       <Topbar title="Ask Navigator" />
       <div className="page-content adviser-page">
         <section className="chat-shell">
-          <div className="chat-header"><div className="navigator-orb">N</div><div><span className="eyebrow">Mock AI adviser</span><h2>Navigator</h2><p>Answers from your profile and prototype data—not live AI yet.</p></div><span className="online-pill">{subscription.usage.adviserMessages}/{plan.limits.adviserMessages} used</span></div>
-          <div className="suggestion-row">{['Which country fits my budget?', 'How should I prepare for IELTS?', 'Help me build a balanced shortlist', 'What funding should I prioritize?'].map((question) => <button onClick={() => send(question)} key={question}>{question}</button>)}</div>
+          <div className="chat-header"><div className="navigator-orb">N</div><div><span className="eyebrow">Mock AI adviser · {serviceMeta[activeService].label}</span><h2>Navigator</h2><p>Answers from your active service and prototype data—not live AI yet.</p></div><span className="online-pill">{subscription.usage.adviserMessages}/{plan.limits.adviserMessages} used</span></div>
+          <div className="suggestion-row">{suggestions[activeService].map((question) => <button onClick={() => send(question)} key={question}>{question}</button>)}</div>
           <div className="messages">
             {messages.map((message) => <div className={`message ${message.role}`} key={message.id}><div>{message.text}</div>{message.sources && <small>Based on: {message.sources.join(' · ')}</small>}</div>)}
           </div>
@@ -514,6 +621,8 @@ function EmptyState({ title, text }: { title: string, text: string }) {
 const gatedFeatureLabels: Record<GatedFeature, string> = {
   studyPlan: 'Full study plan',
   careerPlan: 'Career planning workspace',
+  jobPreparation: 'Job preparation workspace',
+  jobSearch: 'Job search and application tracking',
   shortlist: 'Shortlist and comparison',
   scholarships: 'Scholarship matching',
   roadmap: 'Personal roadmap',
@@ -815,7 +924,145 @@ function CareerChoiceGroup({ title, options, values, onToggle }: { title: string
   return <div className="career-choice-group"><strong>{title}</strong><div>{options.map((option) => <button className={values.includes(option) ? 'selected' : ''} onClick={() => onToggle(option)} key={option}>{values.includes(option) ? '✓ ' : '+ '}{option}</button>)}</div></div>
 }
 
-function Experts({ profile, documents, bookings, setBookings, plan, subscription, setSubscription }: {
+function JobPreparation({ career, preparation, setPreparation, documents, openDocuments, openExperts }: {
+  career: CareerProfile
+  preparation: JobPreparationProfile
+  setPreparation: React.Dispatch<React.SetStateAction<JobPreparationProfile>>
+  documents: UserDocument[]
+  openDocuments: () => void
+  openExperts: () => void
+}) {
+  const [newPortfolioTitle, setNewPortfolioTitle] = useState('')
+  const [activePrompt, setActivePrompt] = useState(0)
+  const [toast, setToast] = useState('')
+  const selectedCareerRole = careerRoles.find((role) => role.id === preparation.targetRoleId)
+  const fallbackRole = careerRoles.find((role) => career.targetRoleIds.includes(role.id)) ?? careerRoles[0]
+  const targetRole = selectedCareerRole ?? fallbackRole
+  const prompts = interviewPrompts[targetRole.id] ?? interviewPrompts['data-analyst']
+  const cvDocument = documents.find((document) => document.id === 'cv')
+  const portfolioDocument = documents.find((document) => document.id === 'other')
+  const cvSectionCount = Object.values(preparation.cvSections).filter(Boolean).length
+  const cvScore = Math.round((cvSectionCount / 6 * 80) + (cvDocument?.status === 'verified' ? 20 : cvDocument?.status === 'uploaded' ? 10 : 0))
+  const readyPortfolioItems = preparation.portfolioItems.filter((item) => item.status === 'ready').length
+  const portfolioScore = Math.min(100, preparation.portfolioItems.length * 18 + readyPortfolioItems * 22 + (portfolioDocument?.status !== 'missing' ? 12 : 0))
+  const interviewScore = Math.min(100, Math.round(preparation.interviewConfidence * .65 + preparation.practiceSessions * 12))
+  const taskScore = Math.round(preparation.completedTasks.length / jobPreparationTasks.length * 100)
+  const overall = Math.round(cvScore * .3 + portfolioScore * .25 + interviewScore * .25 + taskScore * .2)
+
+  const toggleCvSection = (section: keyof JobPreparationProfile['cvSections']) => setPreparation((current) => ({
+    ...current,
+    cvSections: { ...current.cvSections, [section]: !current.cvSections[section] },
+  }))
+  const updatePortfolio = (id: string, patch: Partial<JobPreparationProfile['portfolioItems'][number]>) => setPreparation((current) => ({
+    ...current,
+    portfolioItems: current.portfolioItems.map((item) => item.id === id ? { ...item, ...patch } : item),
+  }))
+  const addPortfolio = () => {
+    const title = newPortfolioTitle.trim()
+    if (!title) return
+    setPreparation((current) => ({ ...current, portfolioItems: [...current.portfolioItems, { id: `portfolio-${Date.now()}`, title, type: 'project', status: 'idea' }] }))
+    setNewPortfolioTitle('')
+    setToast('Portfolio item added to your preparation workspace.')
+  }
+  const toggleTask = (id: string) => setPreparation((current) => ({
+    ...current,
+    completedTasks: current.completedTasks.includes(id) ? current.completedTasks.filter((item) => item !== id) : [...current.completedTasks, id],
+  }))
+
+  return <>
+    <Topbar title="Job preparation" />
+    <div className="page-content">
+      {toast && <Toast message={toast} onClose={() => setToast('')} />}
+      <section className="job-prep-hero">
+        <div><span className="eyebrow light">{targetRole.title} · {career.targetTimeline.replaceAll('-', ' ')}</span><h2>Build evidence before you start sending applications.</h2><p>Strengthen your CV, portfolio, professional story and interview performance around one target role.</p></div>
+        <div className="job-prep-score"><strong>{overall}%</strong><span>application ready</span></div>
+      </section>
+
+      <section className="job-prep-overview">
+        {[['CV readiness', cvScore, cvDocument?.status ?? 'missing'], ['Portfolio evidence', portfolioScore, `${readyPortfolioItems} ready`], ['Interview readiness', interviewScore, `${preparation.practiceSessions} practices`], ['Preparation roadmap', taskScore, `${preparation.completedTasks.length}/${jobPreparationTasks.length} tasks`]].map(([label, score, detail]) => <article key={label}><div><small>{label}</small><strong>{score}%</strong></div><div><span style={{ width: `${score}%` }} /></div><small>{detail}</small></article>)}
+      </section>
+
+      <section className="panel job-target-panel">
+        <div><span className="eyebrow">Preparation target</span><h2>Which role should this material be tailored for?</h2><p>Career Plan targets are available here. Choose one primary role for CV language, portfolio evidence and interview practice.</p></div>
+        <select value={preparation.targetRoleId} onChange={(event) => setPreparation((current) => ({ ...current, targetRoleId: event.target.value }))}>{careerRoles.filter((role) => career.targetRoleIds.includes(role.id) || role.id === preparation.targetRoleId).map((role) => <option value={role.id} key={role.id}>{role.title}</option>)}</select>
+      </section>
+
+      <div className="job-prep-grid">
+        <main>
+          <section className="panel cv-builder">
+            <div className="section-title"><div><span className="eyebrow">CV readiness</span><h2>Content structure and evidence</h2></div><span className={`status-pill ${cvDocument?.status ?? 'missing'}`}>{cvDocument?.status ?? 'missing'}</span></div>
+            <p className="section-copy">This prototype reviews completion signals, not the content of your file. A production version would need explicit document permission and secure analysis.</p>
+            <div className="cv-section-grid">{(Object.keys(preparation.cvSections) as (keyof JobPreparationProfile['cvSections'])[]).map((section) => <button className={preparation.cvSections[section] ? 'complete' : ''} onClick={() => toggleCvSection(section)} key={section}><span>{preparation.cvSections[section] ? '✓' : '+'}</span><div><strong>{section}</strong><small>{section === 'summary' ? `Targeted to ${targetRole.title}` : section === 'projects' ? 'Evidence and measurable outcomes' : 'Relevant, concise and role-aligned'}</small></div></button>)}</div>
+            <div className="document-connection"><div><strong>{cvDocument?.files.length ?? 0} CV file(s) connected</strong><small>Document center status: {cvDocument?.status ?? 'missing'}</small></div><button className="secondary" onClick={openDocuments}>Open document center</button></div>
+          </section>
+
+          <section className="panel portfolio-builder">
+            <div className="section-title"><div><span className="eyebrow">Portfolio and proof</span><h2>Evidence employers can inspect</h2></div><span className="verified">{readyPortfolioItems} ready</span></div>
+            <div className="portfolio-add"><input value={newPortfolioTitle} onChange={(event) => setNewPortfolioTitle(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') addPortfolio() }} placeholder="Add a project or case study" /><button className="primary" onClick={addPortfolio}>Add evidence</button></div>
+            {preparation.portfolioItems.length ? <div className="portfolio-list">{preparation.portfolioItems.map((item) => <article key={item.id}><span>◇</span><div><strong>{item.title}</strong><small>{item.type.replace('-', ' ')}</small></div><select value={item.type} onChange={(event) => updatePortfolio(item.id, { type: event.target.value as typeof item.type })}><option value="project">Project</option><option value="case-study">Case study</option><option value="writing">Writing</option><option value="presentation">Presentation</option></select><select value={item.status} onChange={(event) => updatePortfolio(item.id, { status: event.target.value as typeof item.status })}><option value="idea">Idea</option><option value="draft">Draft</option><option value="ready">Ready</option></select><button aria-label={`Remove ${item.title}`} onClick={() => setPreparation((current) => ({ ...current, portfolioItems: current.portfolioItems.filter((entry) => entry.id !== item.id) }))}>×</button></article>)}</div> : <EmptyState title="No portfolio evidence yet" text={`Add a ${targetRole.title} project, case study, writing sample or presentation.`} />}
+          </section>
+
+          <section className="panel preparation-roadmap">
+            <div className="section-title"><div><span className="eyebrow">Preparation roadmap</span><h2>From generic profile to credible candidate</h2></div><span className="verified">{preparation.completedTasks.length}/{jobPreparationTasks.length}</span></div>
+            {jobPreparationTasks.map((task) => <label className={preparation.completedTasks.includes(task.id) ? 'complete' : ''} key={task.id}><input type="checkbox" checked={preparation.completedTasks.includes(task.id)} onChange={() => toggleTask(task.id)} /><span>{task.phase}</span><div><strong>{task.title}</strong><small>{task.detail}</small></div></label>)}
+          </section>
+        </main>
+
+        <aside>
+          <section className="panel interview-practice">
+            <span className="eyebrow">Interview practice</span><h2>{targetRole.title}</h2><div className="prompt-card"><small>Practice prompt {activePrompt + 1} of {prompts.length}</small><strong>{prompts[activePrompt]}</strong><button onClick={() => setActivePrompt((current) => (current + 1) % prompts.length)}>Next prompt →</button></div>
+            <label>Confidence after practice <strong>{preparation.interviewConfidence}%</strong><input type="range" min="0" max="100" step="5" value={preparation.interviewConfidence} onChange={(event) => setPreparation((current) => ({ ...current, interviewConfidence: Number(event.target.value) }))} /></label>
+            <button className="primary wide" onClick={() => { setPreparation((current) => ({ ...current, practiceSessions: current.practiceSessions + 1, interviewConfidence: Math.min(100, current.interviewConfidence + 5) })); setToast('Practice session recorded.') }}>Record practice session</button>
+          </section>
+          <section className="panel role-keywords"><span className="eyebrow">Role language</span><h2>Evidence to emphasize</h2>{targetRole.coreSkills.map((skill) => <div key={skill}><span>{skill}</span><strong>{career.currentSkills.includes(skill) ? 'Existing skill' : 'Build evidence'}</strong></div>)}</section>
+          <section className="job-review-card"><span>✦</span><h3>Get a human review</h3><p>Share your CV metadata, target role and portfolio plan with a career specialist.</p><button onClick={openExperts}>Book a preparation review →</button></section>
+        </aside>
+      </div>
+    </div>
+  </>
+}
+
+function JobSearch({ career, preparation, applications, setApplications }: {
+  career: CareerProfile
+  preparation: JobPreparationProfile
+  applications: JobApplication[]
+  setApplications: React.Dispatch<React.SetStateAction<JobApplication[]>>
+}) {
+  const [query, setQuery] = useState('')
+  const [mode, setMode] = useState('All')
+  const [toast, setToast] = useState('')
+  const targetIds = new Set([...career.targetRoleIds, preparation.targetRoleId])
+  const matched = jobs.filter((job) => targetIds.has(job.roleId) && (mode === 'All' || job.workMode === mode) && `${job.title} ${job.company} ${job.skills.join(' ')}`.toLowerCase().includes(query.toLowerCase()))
+  const update = (jobId: string, patch: Partial<JobApplication>) => setApplications((current) => current.map((item) => item.jobId === jobId ? { ...item, ...patch } : item))
+  const track = (jobId: string) => {
+    if (applications.some((item) => item.jobId === jobId)) return
+    setApplications((current) => [...current, { jobId, status: 'saved', nextAction: 'Review role and tailor CV', notes: '' }])
+    setToast('Job added to your application tracker.')
+  }
+  return <>
+    <Topbar title="Job search" />
+    <div className="page-content">
+      {toast && <Toast message={toast} onClose={() => setToast('')} />}
+      <section className="job-search-hero"><div><span className="eyebrow light">Focused opportunity search</span><h2>Find roles that match the direction you prepared for.</h2><p>Prototype opportunities are matched to Career Plan targets and connected to a persistent application tracker.</p></div><div><strong>{matched.length}</strong><span>matched roles</span></div></section>
+      <div className="job-search-toolbar"><div className="search-box"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search title, company or skill" /></div><div>{['All', 'Remote', 'Hybrid', 'On-site'].map((item) => <button className={mode === item ? 'active' : ''} onClick={() => setMode(item)} key={item}>{item}</button>)}</div></div>
+      <div className="job-search-layout">
+        <main className="job-listings">{matched.length ? matched.map((job) => {
+          const tracked = applications.find((item) => item.jobId === job.id)
+          const role = careerRoles.find((item) => item.id === job.roleId)
+          const skillFit = Math.round(job.skills.filter((skill) => career.currentSkills.includes(skill)).length / job.skills.length * 100)
+          return <article key={job.id}><div className="job-company-mark" style={{ background: role?.accent }}>{job.company.split(' ').map((word) => word[0]).slice(0, 2).join('')}</div><div className="job-listing-copy"><span>{job.company} · {job.location}</span><h3>{job.title}</h3><div><em>{job.workMode}</em><em>{job.level}</em><em>{job.salaryUsd}</em></div><p>{job.skills.join(' · ')}</p><small>Deadline {job.deadline} · {skillFit}% current skill coverage</small></div><button className={tracked ? 'secondary' : 'primary'} onClick={() => track(job.id)} disabled={Boolean(tracked)}>{tracked ? 'Tracked' : 'Track application'}</button></article>
+        }) : <EmptyState title="No roles match these filters" text="Try another work mode or broaden the search words." />}</main>
+        <aside className="panel job-application-tracker"><div className="section-title"><div><span className="eyebrow">Application tracker</span><h2>{applications.length} active roles</h2></div></div>{applications.length ? applications.map((application) => {
+          const job = jobs.find((item) => item.id === application.jobId)
+          if (!job) return null
+          return <article key={application.jobId}><div><strong>{job.title}</strong><small>{job.company}</small></div><label>Status<select value={application.status} onChange={(event) => update(job.id, { status: event.target.value as JobApplication['status'], appliedAt: event.target.value === 'applied' ? new Date().toISOString().slice(0, 10) : application.appliedAt })}><option value="saved">Saved</option><option value="preparing">Preparing</option><option value="applied">Applied</option><option value="interview">Interview</option><option value="offer">Offer</option><option value="closed">Closed</option></select></label><label>Next action<input value={application.nextAction} onChange={(event) => update(job.id, { nextAction: event.target.value })} /></label><textarea value={application.notes} onChange={(event) => update(job.id, { notes: event.target.value })} placeholder="Notes, contacts or follow-up details" /><button onClick={() => setApplications((current) => current.filter((item) => item.jobId !== job.id))}>Remove</button></article>
+        }) : <EmptyState title="No tracked applications" text="Add a matched role to start managing its next actions." />}</aside>
+      </div>
+    </div>
+  </>
+}
+
+function Experts({ profile, documents, bookings, setBookings, plan, subscription, setSubscription, activeService }: {
   profile: UserProfile
   documents: UserDocument[]
   bookings: ConsultationBooking[]
@@ -823,13 +1070,21 @@ function Experts({ profile, documents, bookings, setBookings, plan, subscription
   plan: SubscriptionPlan
   subscription: SubscriptionState
   setSubscription: React.Dispatch<React.SetStateAction<SubscriptionState>>
+  activeService: ServiceType
 }) {
   const [specialization, setSpecialization] = useState('All expertise')
   const [country, setCountry] = useState('All countries')
   const [selectedExpert, setSelectedExpert] = useState<Expert | null>(null)
   const [bookingExpert, setBookingExpert] = useState<Expert | null>(null)
   const [toast, setToast] = useState('')
-  const filtered = experts.filter((expert) =>
+  const serviceKeywords: Record<ServiceType, string[]> = {
+    study: ['study', 'admission', 'scholarship', 'programme', 'sop', 'academic'],
+    career: ['career', 'transition', 'positioning'],
+    'job-preparation': ['cv', 'portfolio', 'interview'],
+    'job-search': ['cv', 'interview', 'positioning'],
+  }
+  const serviceExperts = experts.filter((expert) => expert.specializations.some((item) => serviceKeywords[activeService].some((keyword) => item.toLowerCase().includes(keyword))))
+  const filtered = serviceExperts.filter((expert) =>
     (specialization === 'All expertise' || expert.specializations.includes(specialization)) &&
     (country === 'All countries' || expert.countries.includes(country))
   )
@@ -843,7 +1098,7 @@ function Experts({ profile, documents, bookings, setBookings, plan, subscription
       <Topbar title="Expert consultations" />
       <div className="page-content">
         {toast && <Toast message={toast} onClose={() => setToast('')} />}
-        <section className="expert-hero"><div><span className="eyebrow light">Human guidance, when it matters</span><h2>Bring an expert into your study plan.</h2><p>Book a focused review with your profile, shortlist and selected documents already organized.</p></div><div><strong>{experts.length}</strong><span>prototype experts</span></div></section>
+        <section className="expert-hero"><div><span className="eyebrow light">Human guidance · {serviceMeta[activeService].label}</span><h2>Bring a specialist into your current plan.</h2><p>Book a focused review with your profile, progress and selected documents already organized.</p></div><div><strong>{serviceExperts.length}</strong><span>relevant experts</span></div></section>
 
         {upcoming.length > 0 && <section className="upcoming-consultations panel">
           <div className="section-title"><div><span className="eyebrow">Upcoming</span><h2>Your booked consultations</h2></div></div>
@@ -851,12 +1106,13 @@ function Experts({ profile, documents, bookings, setBookings, plan, subscription
             const expert = experts.find((item) => item.id === booking.expertId)
             const service = expert?.services.find((item) => item.id === booking.serviceId)
             if (!expert || !service) return null
-            return <article className="booking-row" key={booking.id}><div className="expert-avatar small" style={{ background: expert.accent }}>{expert.initials}</div><div><strong>{service.title}</strong><span>{expert.name}</span><small>{formatProfileDate(booking.date, profile)} · {booking.time} · {booking.timezone}</small></div><div className="shared-count">▤ {booking.documentIds.length} shared</div><button onClick={() => { updateBooking(booking.id, { status: 'cancelled' }); setToast('Consultation cancelled in the prototype.') }}>Cancel</button></article>
+            const nextDate = Object.keys(expert.availability).find((item) => item !== booking.date) ?? booking.date
+            return <article className="booking-row" key={booking.id}><div className="expert-avatar small" style={{ background: expert.accent }}>{expert.initials}</div><div><strong>{service.title}</strong><span>{expert.name}</span><small>{formatProfileDate(booking.date, profile)} · {booking.time} · {booking.timezone}</small></div><div className="shared-count">▤ {booking.documentIds.length} shared</div><div className="booking-row-actions"><button onClick={() => { updateBooking(booking.id, { date: nextDate, time: expert.availability[nextDate][0] }); setToast('Consultation rescheduled to the next available prototype slot.') }}>Reschedule</button><button onClick={() => updateBooking(booking.id, { status: 'completed', expertNotes: booking.expertNotes || 'Expert review completed. Add recommendations here.' })}>Complete</button><button onClick={() => { updateBooking(booking.id, { status: 'cancelled' }); setToast('Consultation cancelled in the prototype.') }}>Cancel</button></div></article>
           })}</div>
         </section>}
 
         <div className="expert-toolbar">
-          <div><select value={specialization} onChange={(event) => setSpecialization(event.target.value)}><option>All expertise</option>{[...new Set(experts.flatMap((expert) => expert.specializations))].map((item) => <option key={item}>{item}</option>)}</select><select value={country} onChange={(event) => setCountry(event.target.value)}><option>All countries</option>{[...new Set(experts.flatMap((expert) => expert.countries))].sort().map((item) => <option key={item}>{item}</option>)}</select></div><span>{filtered.length} experts</span>
+          <div><select value={specialization} onChange={(event) => setSpecialization(event.target.value)}><option>All expertise</option>{[...new Set(serviceExperts.flatMap((expert) => expert.specializations))].map((item) => <option key={item}>{item}</option>)}</select><select value={country} onChange={(event) => setCountry(event.target.value)}><option>All countries</option>{[...new Set(serviceExperts.flatMap((expert) => expert.countries))].sort().map((item) => <option key={item}>{item}</option>)}</select></div><span>{filtered.length} experts</span>
         </div>
 
         <div className="expert-grid">{filtered.map((expert) => {
@@ -872,17 +1128,18 @@ function Experts({ profile, documents, bookings, setBookings, plan, subscription
 
         {previous.length > 0 && <section className="consultation-history panel"><span className="eyebrow">History</span><h2>Previous and cancelled consultations</h2>{previous.map((booking) => {
           const expert = experts.find((item) => item.id === booking.expertId)
-          return <div key={booking.id}><strong>{expert?.name}</strong><span>{formatProfileDate(booking.date, profile)} · {booking.status}</span></div>
+          return <div className="history-record" key={booking.id}><div><strong>{expert?.name}</strong><span>{formatProfileDate(booking.date, profile)} · {booking.status}</span></div>{booking.status === 'completed' && <textarea value={booking.expertNotes ?? ''} onChange={(event) => updateBooking(booking.id, { expertNotes: event.target.value })} placeholder="Expert notes and recommendations" />}</div>
         })}</section>}
       </div>
       {selectedExpert && <ExpertProfileModal expert={selectedExpert} profile={profile} onClose={() => setSelectedExpert(null)} onBook={() => { setBookingExpert(selectedExpert); setSelectedExpert(null) }} />}
-      {bookingExpert && <BookingModal expert={bookingExpert} profile={profile} documents={documents} availableExpertCredits={subscription.usage.expertCredits} priorityAccess={canUseFeature(plan.id, 'priorityExperts')} onClose={() => setBookingExpert(null)} onConfirm={(booking) => { setBookings((current) => [...current, booking]); if (booking.usedExpertCredit) setSubscription((current) => ({ ...current, usage: { ...current.usage, expertCredits: Math.max(0, current.usage.expertCredits - 1) } })); setBookingExpert(null); setToast(booking.usedExpertCredit ? 'Consultation booked using an expert credit.' : 'Consultation booked successfully.') }} />}
+      {bookingExpert && <BookingModal expert={bookingExpert} profile={profile} documents={documents} activeService={activeService} availableExpertCredits={subscription.usage.expertCredits} priorityAccess={canUseFeature(plan.id, 'priorityExperts')} onClose={() => setBookingExpert(null)} onConfirm={(booking) => { setBookings((current) => [...current, booking]); if (booking.usedExpertCredit) setSubscription((current) => ({ ...current, usage: { ...current.usage, expertCredits: Math.max(0, current.usage.expertCredits - 1) } })); setBookingExpert(null); setToast(booking.usedExpertCredit ? 'Consultation booked using an expert credit.' : 'Consultation booked successfully.') }} />}
     </>
   )
 }
 
 function ExpertProfileModal({ expert, profile, onClose, onBook }: { expert: Expert, profile: UserProfile, onClose: () => void, onBook: () => void }) {
-  return <div className="modal-backdrop" onMouseDown={onClose}><section className="expert-profile-modal" role="dialog" aria-modal="true" aria-labelledby="expert-profile-title" onMouseDown={(event) => event.stopPropagation()}>
+  const modalRef = useAccessibleModal(onClose)
+  return <div className="modal-backdrop" onMouseDown={onClose}><section ref={modalRef} className="expert-profile-modal" role="dialog" aria-modal="true" aria-labelledby="expert-profile-title" onMouseDown={(event) => event.stopPropagation()}>
     <button className="modal-close" aria-label="Close expert profile" onClick={onClose}>×</button>
     <div className="expert-profile-head"><div className="expert-avatar large" style={{ background: expert.accent }}>{expert.initials}</div><div><span className="eyebrow">{expert.specializations.join(' · ')}</span><h2 id="expert-profile-title">{expert.name}</h2><p>{expert.title}</p><div className="profile-rating">★ {expert.rating} from {expert.reviews} reviews · {expert.experienceYears} years experience</div></div></div>
     <p className="modal-bio">{expert.bio}</p>
@@ -893,14 +1150,16 @@ function ExpertProfileModal({ expert, profile, onClose, onBook }: { expert: Expe
   </section></div>
 }
 
-function BookingModal({ expert, profile, documents, availableExpertCredits, priorityAccess, onClose, onConfirm }: { expert: Expert, profile: UserProfile, documents: UserDocument[], availableExpertCredits: number, priorityAccess: boolean, onClose: () => void, onConfirm: (booking: ConsultationBooking) => void }) {
+function BookingModal({ expert, profile, documents, activeService, availableExpertCredits, priorityAccess, onClose, onConfirm }: { expert: Expert, profile: UserProfile, documents: UserDocument[], activeService: ServiceType, availableExpertCredits: number, priorityAccess: boolean, onClose: () => void, onConfirm: (booking: ConsultationBooking) => void }) {
   const [step, setStep] = useState(1)
   const [serviceId, setServiceId] = useState(expert.services[0].id)
   const dates = Object.keys(expert.availability)
   const [date, setDate] = useState(dates[0])
   const [time, setTime] = useState(expert.availability[dates[0]][0])
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>(documents.filter((item) => item.status !== 'missing').map((item) => item.id).slice(0, 2))
-  const [summary, setSummary] = useState(`I want expert guidance on my ${profile.targetDegree} ${profile.subject} plan for ${profile.preferredIntake}. My preferred destinations are ${profile.preferredCountries.join(', ')}.`)
+  const [summary, setSummary] = useState(activeService === 'study'
+    ? `I want expert guidance on my ${profile.targetDegree} ${profile.subject} plan for ${profile.preferredIntake}. My preferred destinations are ${profile.preferredCountries.join(', ')}.`
+    : `I want expert guidance for my ${serviceMeta[activeService].label.toLowerCase()} goal. Please review my current direction, evidence and next actions.`)
   const [consent, setConsent] = useState(false)
   const [useCredit, setUseCredit] = useState(availableExpertCredits > 0)
   const service = expert.services.find((item) => item.id === serviceId) ?? expert.services[0]
@@ -923,7 +1182,8 @@ function BookingModal({ expert, profile, documents, availableExpertCredits, prio
     })
   }
 
-  return <div className="modal-backdrop"><section className="booking-modal" role="dialog" aria-modal="true" aria-labelledby="booking-title">
+  const modalRef = useAccessibleModal(onClose)
+  return <div className="modal-backdrop" onMouseDown={onClose}><section ref={modalRef} className="booking-modal" role="dialog" aria-modal="true" aria-labelledby="booking-title" onMouseDown={(event) => event.stopPropagation()}>
     <button className="modal-close" aria-label="Close booking" onClick={onClose}>×</button>
     <div className="booking-heading"><span className="eyebrow">Book consultation · Step {step} of 4</span><h2 id="booking-title">{expert.name}</h2><div className="booking-stepper">{[1, 2, 3, 4].map((item) => <span className={item <= step ? 'active' : ''} key={item} />)}</div></div>
     {step === 1 && <div className="booking-content"><h3>Choose a service</h3><div className="service-choice">{expert.services.map((item) => <button className={serviceId === item.id ? 'selected' : ''} onClick={() => setServiceId(item.id)} key={item.id}><div><strong>{item.title}</strong><small>{item.durationMinutes} minutes · {item.description}</small></div><strong>{formatUsd(item.priceUsd, profile)}</strong></button>)}</div></div>}
@@ -938,17 +1198,20 @@ function formatUsd(valueUsd: number, profile: UserProfile) {
   return formatPreferredCurrency(valueUsd * 122, profile.preferredCurrency, profile.interfaceLanguage)
 }
 
-function Subscription({ profile, subscription, setSubscription, savedCount, documentFolderCount, bookingCount }: {
+function Subscription({ profile, subscription, setSubscription, savedCount, documentFolderCount, bookingCount, activeGoalCount }: {
   profile: UserProfile
   subscription: SubscriptionState
   setSubscription: React.Dispatch<React.SetStateAction<SubscriptionState>>
   savedCount: number
   documentFolderCount: number
   bookingCount: number
+  activeGoalCount: number
 }) {
   const [billingCycle, setBillingCycle] = useState(subscription.billingCycle)
   const [pendingPlan, setPendingPlan] = useState<SubscriptionPlan | null>(null)
   const [toast, setToast] = useState('')
+  const closePlanModal = () => setPendingPlan(null)
+  const planModalRef = useAccessibleModal(closePlanModal)
   const currentPlan = plans.find((plan) => plan.id === subscription.planId) ?? plans[1]
   const usageItems = [
     { label: 'Adviser messages', used: subscription.usage.adviserMessages, limit: currentPlan.limits.adviserMessages },
@@ -956,6 +1219,7 @@ function Subscription({ profile, subscription, setSubscription, savedCount, docu
     { label: 'Saved programmes', used: savedCount, limit: currentPlan.limits.shortlist },
     { label: 'Document folders', used: documentFolderCount, limit: currentPlan.limits.documentFolders },
     { label: 'Expert credits', used: Math.max(0, currentPlan.limits.expertCredits - subscription.usage.expertCredits), limit: currentPlan.limits.expertCredits },
+    { label: 'Active services', used: activeGoalCount, limit: currentPlan.limits.activeGoals },
   ]
   const applyPlan = () => {
     if (!pendingPlan) return
@@ -999,19 +1263,19 @@ function Subscription({ profile, subscription, setSubscription, savedCount, docu
             <div className="plan-card-heading"><div><span className="eyebrow">{current ? 'Your plan' : plan.name}</span><h3>{plan.name}</h3></div>{current && <span className="current-check">✓</span>}</div>
             <p>{plan.tagline}</p><div className="plan-card-price"><strong>{price === 0 ? 'Free' : formatUsd(price, profile)}</strong><span>{price === 0 ? 'No payment' : billingCycle === 'annual' ? '/ year' : '/ month'}</span></div>
             <ul>{plan.features.map((feature) => <li key={feature}>✓ {feature}</li>)}</ul>
-            <div className="plan-limits"><span>{plan.limits.shortlist >= 999 ? 'Unlimited' : plan.limits.shortlist} saved programmes</span><span>{plan.limits.adviserMessages} adviser messages</span><span>{plan.limits.expertCredits} expert credit(s)</span></div>
+            <div className="plan-limits"><span>{plan.limits.activeGoals} active service(s)</span><span>{plan.limits.shortlist >= 999 ? 'Unlimited' : plan.limits.shortlist} saved programmes</span><span>{plan.limits.adviserMessages} adviser messages</span><span>{plan.limits.expertCredits} expert credit(s)</span></div>
             <button className={current ? 'secondary wide' : 'primary wide'} disabled={current} onClick={() => setPendingPlan(plan)}>{current ? 'Current plan' : plan.monthlyUsd > currentPlan.monthlyUsd ? 'Upgrade plan' : 'Change plan'}</button>
           </article>
         })}</section>
 
         <section className="billing-note"><span>i</span><div><strong>Prototype billing</strong><p>No payment method is collected. Plan changes only update local browser entitlements so you can test feature access and usage.</p></div></section>
       </div>
-      {pendingPlan && <div className="modal-backdrop"><section className="plan-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="plan-change-title"><button className="modal-close" aria-label="Close plan change" onClick={() => setPendingPlan(null)}>×</button><span className="eyebrow">Confirm plan change</span><h2 id="plan-change-title">{currentPlan.name} → {pendingPlan.name}</h2><p>Your prototype entitlements will update immediately. No payment will be processed.</p><div className="confirmation-price"><small>{billingCycle} price</small><strong>{pendingPlan.monthlyUsd === 0 ? 'Free' : formatUsd(billingCycle === 'annual' ? pendingPlan.annualUsd : pendingPlan.monthlyUsd, profile)}</strong></div><div className="plan-confirm-actions"><button className="secondary" onClick={() => setPendingPlan(null)}>Cancel</button><button className="primary" onClick={applyPlan}>Confirm change</button></div></section></div>}
+      {pendingPlan && <div className="modal-backdrop" onMouseDown={closePlanModal}><section ref={planModalRef} className="plan-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="plan-change-title" onMouseDown={(event) => event.stopPropagation()}><button className="modal-close" aria-label="Close plan change" onClick={closePlanModal}>×</button><span className="eyebrow">Confirm plan change</span><h2 id="plan-change-title">{currentPlan.name} → {pendingPlan.name}</h2><p>Your prototype entitlements will update immediately. No payment will be processed.</p><div className="confirmation-price"><small>{billingCycle} price</small><strong>{pendingPlan.monthlyUsd === 0 ? 'Free' : formatUsd(billingCycle === 'annual' ? pendingPlan.annualUsd : pendingPlan.monthlyUsd, profile)}</strong></div><div className="plan-confirm-actions"><button className="secondary" onClick={closePlanModal}>Cancel</button><button className="primary" onClick={applyPlan}>Confirm change</button></div></section></div>}
     </>
   )
 }
 
-function Roadmap({ documents }: { documents: UserDocument[] }) {
+function Roadmap({ documents, setView }: { documents: UserDocument[], setView: (view: View) => void }) {
   const [items, setItems] = usePersistentState<RoadmapItem[]>('navigator-roadmap', initialRoadmap)
   const effectiveItems = items.map((item) => {
     const linkedDocument = documents.find((document) => document.linkedTask === item.title)
@@ -1028,10 +1292,10 @@ function Roadmap({ documents }: { documents: UserDocument[] }) {
           <section className="roadmap-list">
             {effectiveItems.map((item, index) => <article className={`roadmap-item ${item.status}`} key={item.id}>
               <div className="timeline"><button onClick={() => toggle(item.id)}>{item.status === 'completed' ? '✓' : index + 1}</button><span /></div>
-              <div className="roadmap-copy"><div><span className="category">{item.category}</span><span className="roadmap-due">{item.due}</span></div><h3>{item.title}</h3><p>{item.description}</p>{documents.some((document) => document.linkedTask === item.title && document.status !== 'missing') && <span className="evidence-badge">▤ Document evidence added</span>}{item.status === 'current' && <button className="primary small">Continue task →</button>}</div>
+              <div className="roadmap-copy"><div><span className="category">{item.category}</span><span className="roadmap-due">{item.due}</span></div><h3>{item.title}</h3><p>{item.description}</p>{documents.some((document) => document.linkedTask === item.title && document.status !== 'missing') && <span className="evidence-badge">▤ Document evidence added</span>}{item.status === 'current' && <button className="primary small" onClick={() => setView(item.category === 'Documents' ? 'documents' : item.category === 'Funding' ? 'scholarships' : 'study-plan')}>Continue task →</button>}</div>
             </article>)}
           </section>
-          <aside className="roadmap-aside"><section className="panel"><span className="eyebrow">Readiness breakdown</span>{[['Academic profile', 88], ['English test', 35], ['Documents', 62], ['Funding plan', 48]].map(([label, score]) => <div className="skill-progress" key={label}><div><span>{label}</span><strong>{score}%</strong></div><div><span style={{ width: `${score}%` }} /></div></div>)}</section><section className="advisor-card"><span>✦</span><h3>Need a hand?</h3><p>Ask your AI guide to explain a task or help you make a decision.</p><button>Ask Navigator</button></section></aside>
+          <aside className="roadmap-aside"><section className="panel"><span className="eyebrow">Readiness breakdown</span>{[['Academic profile', 88], ['English test', 35], ['Documents', 62], ['Funding plan', 48]].map(([label, score]) => <div className="skill-progress" key={label}><div><span>{label}</span><strong>{score}%</strong></div><div><span style={{ width: `${score}%` }} /></div></div>)}</section><section className="advisor-card"><span>✦</span><h3>Need a hand?</h3><p>Ask your AI guide to explain a task or help you make a decision.</p><button onClick={() => setView('adviser')}>Ask Navigator</button></section></aside>
         </div>
       </div>
     </>
@@ -1178,7 +1442,7 @@ function Profile({ profile, onSave }: { profile: UserProfile, onSave: (profile: 
           <MultiAutocomplete label="Preferred countries" values={draft.preferredCountries} options={countries} onChange={(preferredCountries) => setDraft({ ...draft, preferredCountries })} />
           <label>Preferred currency<select value={draft.preferredCurrency} onChange={(e) => setDraft({ ...draft, preferredCurrency: e.target.value })}>{currencies.map((currency) => <option value={currency.code} key={currency.code}>{currency.code} — {currency.label}</option>)}</select></label>
           <label>Annual budget ({draft.preferredCurrency})<input type="number" step="1000" value={bdtToPreferred(draft.annualBudgetBdt, draft.preferredCurrency)} onChange={(e) => setDraft({ ...draft, annualBudgetBdt: preferredToBdt(Number(e.target.value), draft.preferredCurrency) })} /></label>
-          <label>Interface language<select value={draft.interfaceLanguage} onChange={(e) => setDraft({ ...draft, interfaceLanguage: e.target.value as UserProfile['interfaceLanguage'] })}><option value="en">English</option><option value="bn">বাংলা (Bangla preview)</option></select></label>
+          <label>Interface language<select value={draft.interfaceLanguage} onChange={(e) => setDraft({ ...draft, interfaceLanguage: e.target.value as UserProfile['interfaceLanguage'] })}><option value="en">English</option><option value="bn">বাংলা</option></select></label>
           <label>Timezone<select value={draft.timezone} onChange={(e) => setDraft({ ...draft, timezone: e.target.value })}>{timezones.map((timezone) => <option key={timezone}>{timezone}</option>)}</select></label>
           <label>Date format<select value={draft.dateFormat} onChange={(e) => setDraft({ ...draft, dateFormat: e.target.value as UserProfile['dateFormat'] })}><option value="day-first">Day first · 18 Jun 2026</option><option value="month-first">Month first · Jun 18, 2026</option><option value="iso">ISO · 2026-06-18</option></select></label>
           <label>Week starts on<select value={draft.weekStartsOn} onChange={(e) => setDraft({ ...draft, weekStartsOn: e.target.value as UserProfile['weekStartsOn'] })}><option value="monday">Monday</option><option value="sunday">Sunday</option></select></label>
@@ -1210,6 +1474,10 @@ function App() {
   const [documents, setDocuments] = usePersistentState<UserDocument[]>('navigator-documents', defaultDocuments)
   const [applications, setApplications] = usePersistentState<ApplicationRecord[]>('navigator-applications', [])
   const [careerProfile, setCareerProfile] = usePersistentState<CareerProfile>('navigator-career-profile', defaultCareerProfile)
+  const [jobPreparation, setJobPreparation] = usePersistentState<JobPreparationProfile>('navigator-job-preparation', defaultJobPreparationProfile)
+  const [jobApplications, setJobApplications] = usePersistentState<JobApplication[]>('navigator-job-applications', defaultJobApplications)
+  const initialService = serviceFromGoal(profile.goal)
+  const [services, setServices] = usePersistentState<ServiceState>('navigator-services', { active: [initialService], selected: initialService })
   const [bookings, setBookings] = usePersistentState<ConsultationBooking[]>('navigator-consultations', [])
   const [subscription, setSubscription] = usePersistentState<SubscriptionState>('navigator-subscription', {
     planId: 'essential',
@@ -1222,6 +1490,9 @@ function App() {
   useEffect(() => {
     document.documentElement.lang = profile.interfaceLanguage
   }, [profile.interfaceLanguage])
+  useEffect(() => {
+    setSubscription((current) => current.usage.comparisons === compareIds.length ? current : ({ ...current, usage: { ...current.usage, comparisons: compareIds.length } }))
+  }, [compareIds.length, setSubscription])
   const normalizedDocuments = useMemo(() => normalizeDocuments(documents), [documents])
   useEffect(() => {
     if (JSON.stringify(documents) !== JSON.stringify(normalizedDocuments)) setDocuments(normalizedDocuments)
@@ -1231,15 +1502,45 @@ function App() {
   const notifications = useMemo(() => buildNotifications(profile, strongestProgram, normalizedDocuments), [profile, strongestProgram, normalizedDocuments])
   const missingDocuments = normalizedDocuments.filter((item) => item.required && item.status === 'missing').length
   const currentPlan = plans.find((plan) => plan.id === subscription.planId) ?? plans[1]
+  useEffect(() => {
+    setServices((current) => {
+      if (current.active.length <= currentPlan.limits.activeGoals) return current
+      const active = current.active.slice(0, currentPlan.limits.activeGoals)
+      return { active, selected: active.includes(current.selected) ? current.selected : active[0] }
+    })
+  }, [currentPlan.limits.activeGoals, setServices])
 
   if (!authenticated) return <AuthScreen onAuthenticated={(isNew) => { setAuthenticated(true); if (isNew) setOnboarded(false) }} />
-  if (!onboarded) return <Onboarding profile={profile} onComplete={(updatedProfile) => { setProfile(updatedProfile); localStorage.setItem('navigator-onboarded', 'true'); setOnboarded(true) }} />
+  if (!onboarded) return <Onboarding profile={profile} onComplete={(updatedProfile) => {
+    const session = JSON.parse(localStorage.getItem('navigator-session') || '{}') as { name?: string }
+    const completedProfile = session.name && session.name !== 'Samira Rahman' ? { ...updatedProfile, fullName: session.name } : updatedProfile
+    const selected = serviceFromGoal(completedProfile.goal)
+    setProfile(completedProfile)
+    setServices({ active: [selected], selected })
+    localStorage.setItem('navigator-onboarded', 'true')
+    setOnboarded(true)
+  }} />
 
   const openProgram = (program: Program) => { setSelectedProgram(program); setView('program') }
   const logout = () => { localStorage.removeItem('navigator-session'); setAuthenticated(false) }
   const requestUpgrade = (feature: GatedFeature) => {
     setView('subscription')
     setAppToast(`${gatedFeatureLabels[feature]} is available on the ${minimumPlanName(feature)} plan.`)
+  }
+  const selectService = (service: ServiceType) => {
+    setServices((current) => ({ ...current, selected: service }))
+    setView('dashboard')
+  }
+  const addService = (service: ServiceType) => {
+    if (services.active.includes(service)) return selectService(service)
+    if (services.active.length >= currentPlan.limits.activeGoals) {
+      setView('subscription')
+      setAppToast(`Your ${currentPlan.name} plan supports ${currentPlan.limits.activeGoals} active service(s).`)
+      return
+    }
+    setServices((current) => ({ active: [...current.active, service], selected: service }))
+    setView('dashboard')
+    setAppToast(`${serviceMeta[service].label} added to your workspace.`)
   }
   const toggleSaved = (id: string) => setSavedIds((current) => {
     if (current.includes(id)) return current.filter((item) => item !== id)
@@ -1251,48 +1552,54 @@ function App() {
     return [...current, id]
   })
   const toggleCompare = (id: string) => setCompareIds((current) => {
-    if (current.includes(id)) return current.filter((item) => item !== id)
+    if (current.includes(id)) {
+      const next = current.filter((item) => item !== id)
+      setSubscription((state) => ({ ...state, usage: { ...state.usage, comparisons: next.length } }))
+      return next
+    }
     if (current.length >= currentPlan.limits.comparisons) {
       setView('subscription')
       setAppToast(`Your ${currentPlan.name} plan comparison limit has been reached.`)
       return current
     }
-    setSubscription((state) => ({ ...state, usage: { ...state.usage, comparisons: state.usage.comparisons + 1 } }))
-    return [...current, id]
+    const next = [...current, id]
+    setSubscription((state) => ({ ...state, usage: { ...state.usage, comparisons: next.length } }))
+    return next
   })
   const resetDemo = () => {
     if (!window.confirm('Reset all prototype profile, document, shortlist, roadmap and adviser data?')) return
-    ;['navigator-profile', 'navigator-documents', 'navigator-shortlist', 'navigator-comparison', 'navigator-roadmap', 'navigator-chat', 'navigator-applications', 'navigator-career-profile', 'navigator-later-study-tasks', 'navigator-consultations', 'navigator-subscription'].forEach((key) => localStorage.removeItem(key))
+    ;['navigator-profile', 'navigator-documents', 'navigator-shortlist', 'navigator-comparison', 'navigator-roadmap', 'navigator-chat', 'navigator-applications', 'navigator-career-profile', 'navigator-job-preparation', 'navigator-job-applications', 'navigator-services', 'navigator-later-study-tasks', 'navigator-consultations', 'navigator-subscription'].forEach((key) => localStorage.removeItem(key))
     window.location.reload()
   }
 
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-workspace">Skip to main content</a>
-      <Sidebar view={view} setView={setView} onLogout={logout} documentCount={missingDocuments} planId={currentPlan.id} onLocked={requestUpgrade} />
+      <Sidebar view={view} setView={setView} onLogout={logout} documentCount={missingDocuments} planId={currentPlan.id} onLocked={requestUpgrade} profile={profile} services={services} onServiceChange={selectService} />
       <main className="workspace" id="main-workspace" tabIndex={-1}>
         {appToast && <Toast message={appToast} onClose={() => setAppToast('')} />}
-        {view === 'dashboard' && <Dashboard setView={setView} openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} profile={profile} scores={scores} notifications={notifications} plan={currentPlan} />}
+        {view === 'dashboard' && <Dashboard setView={setView} openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} profile={profile} scores={scores} notifications={notifications} plan={currentPlan} services={services} onSelectService={selectService} onAddService={addService} career={careerProfile} preparation={jobPreparation} jobApplications={jobApplications} />}
         {view === 'study-plan' && <StudyPlan profile={profile} documents={normalizedDocuments} savedIds={savedIds} scores={scores} applications={applications} setApplications={setApplications} setView={setView} openProgram={openProgram} />}
         {view === 'career-plan' && <CareerPlan profile={profile} career={careerProfile} setCareer={setCareerProfile} openExperts={() => setView('experts')} />}
+        {view === 'job-preparation' && <JobPreparation career={careerProfile} preparation={jobPreparation} setPreparation={setJobPreparation} documents={normalizedDocuments} openDocuments={() => setView('documents')} openExperts={() => setView('experts')} />}
+        {view === 'job-search' && <JobSearch career={careerProfile} preparation={jobPreparation} applications={jobApplications} setApplications={setJobApplications} />}
         {view === 'explore' && <Explore openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} openCompare={() => setView('shortlist')} scores={scores} profile={profile} plan={currentPlan} />}
         {view === 'program' && <ProgramDetail program={selectedProgram} score={scores[selectedProgram.id]} profile={profile} goBack={() => setView('explore')} goRoadmap={() => canUseFeature(currentPlan.id, 'roadmap') ? setView('roadmap') : requestUpgrade('roadmap')} saved={savedIds.includes(selectedProgram.id)} toggleSaved={() => toggleSaved(selectedProgram.id)} advancedCosts={canUseFeature(currentPlan.id, 'advancedCosts')} onUpgrade={() => requestUpgrade('advancedCosts')} />}
         {view === 'shortlist' && <Shortlist savedIds={savedIds} compareIds={compareIds} openProgram={openProgram} toggleSaved={toggleSaved} toggleCompare={toggleCompare} scores={scores} profile={profile} plan={currentPlan} />}
         {view === 'scholarships' && <Scholarships openProgram={openProgram} />}
-        {view === 'roadmap' && <Roadmap documents={normalizedDocuments} />}
+        {view === 'roadmap' && <Roadmap documents={normalizedDocuments} setView={setView} />}
         {view === 'documents' && <Documents documents={normalizedDocuments} onChange={setDocuments} onProfileUpdate={(update) => { setProfile((current) => ({ ...current, ...update })); setAppToast('Profile readiness updated from document status.') }} setView={setView} plan={currentPlan} onUpgrade={requestUpgrade} />}
-        {view === 'adviser' && <Adviser plan={currentPlan} subscription={subscription} setSubscription={setSubscription} openPlans={() => setView('subscription')} />}
-        {view === 'experts' && <Experts profile={profile} documents={normalizedDocuments} bookings={bookings} setBookings={setBookings} plan={currentPlan} subscription={subscription} setSubscription={setSubscription} />}
-        {view === 'subscription' && <Subscription profile={profile} subscription={subscription} setSubscription={setSubscription} savedCount={savedIds.length} documentFolderCount={normalizedDocuments.length} bookingCount={bookings.length} />}
+        {view === 'adviser' && <Adviser plan={currentPlan} subscription={subscription} setSubscription={setSubscription} openPlans={() => setView('subscription')} activeService={services.selected} profile={profile} />}
+        {view === 'experts' && <Experts profile={profile} documents={normalizedDocuments} bookings={bookings} setBookings={setBookings} plan={currentPlan} subscription={subscription} setSubscription={setSubscription} activeService={services.selected} />}
+        {view === 'subscription' && <Subscription profile={profile} subscription={subscription} setSubscription={setSubscription} savedCount={savedIds.length} documentFolderCount={normalizedDocuments.length} bookingCount={bookings.length} activeGoalCount={services.active.length} />}
         {view === 'profile' && <><Profile profile={profile} onSave={(updated) => { setProfile(updated); setAppToast('Profile saved. Guidance has been recalculated.') }} /><div className="reset-demo-wrap"><button className="reset-demo" onClick={resetDemo}>Reset all demo data</button></div></>}
       </main>
       <nav className="mobile-nav">
         {([
           ['dashboard', '⌂', 'Home'],
-          ['study-plan', '◎', 'Study', 'studyPlan'],
-          ['career-plan', '↗', 'Career', 'careerPlan'],
-          ['explore', '⌕', 'Explore'],
-          ['shortlist', '◇', 'Saved', 'shortlist'],
+          [serviceMeta[services.selected].view, serviceMeta[services.selected].icon, serviceMeta[services.selected].label.split(' ')[0], services.selected === 'study' ? 'studyPlan' : services.selected === 'career' ? 'careerPlan' : services.selected === 'job-preparation' ? 'jobPreparation' : 'jobSearch'],
+          ...(services.selected === 'study' ? [['explore', '⌕', 'Explore'], ['shortlist', '◇', 'Saved', 'shortlist']] : []),
+          ['documents', '▤', 'Docs', 'documents'],
         ] as [View, string, string, GatedFeature?][]).map(([id, icon, label, feature]) => {
           const locked = Boolean(feature && !canUseFeature(currentPlan.id, feature))
           return <button className={`${view === id || (view === 'program' && id === 'explore') ? 'active' : ''} ${locked ? 'locked' : ''}`} onClick={() => locked && feature ? requestUpgrade(feature) : setView(id)} key={id}><span>{icon}</span>{label}{locked && <em>⌁</em>}</button>
@@ -1301,6 +1608,7 @@ function App() {
       </nav>
       {mobileMoreOpen && <div className="mobile-more-backdrop" onClick={() => setMobileMoreOpen(false)}><section className="mobile-more-sheet" aria-label="More navigation" onClick={(event) => event.stopPropagation()}><div><strong>More tools</strong><button aria-label="Close more navigation" onClick={() => setMobileMoreOpen(false)}>×</button></div>{([
         ['scholarships', '$', 'Scholarships', 'scholarships'],
+        ['shortlist', '◇', 'Saved programmes', 'shortlist'],
         ['roadmap', '✓', 'My roadmap', 'roadmap'],
         ['adviser', '✦', 'Ask Navigator', 'adviser'],
         ['experts', '◉', 'Expert consultations', 'expertBooking'],
