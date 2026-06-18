@@ -6,8 +6,9 @@ import { usePersistentState } from './hooks/usePersistentState'
 import { Autocomplete, MultiAutocomplete } from './components/Autocomplete'
 import { countries, currencies, subjects, universities } from './data/referenceData'
 import { defaultDocuments } from './data/documents'
+import { studyPhases } from './data/studyPlan'
 import { bdtToPreferred, buildNotifications, defaultProfile, estimateCost, formatPreferredCurrency, preferredToBdt, scoreProgram } from './lib/personalization'
-import type { AppNotification, ChatMessage, DocumentFile, Program, ProgramScore, RoadmapItem, Scholarship, UserDocument, UserProfile, View } from './types'
+import type { ApplicationRecord, ApplicationStatus, AppNotification, ChatMessage, DocumentFile, Program, ProgramScore, RoadmapItem, Scholarship, StudyPhaseId, UserDocument, UserProfile, View } from './types'
 import './App.css'
 
 type AuthMode = 'login' | 'signup'
@@ -173,6 +174,7 @@ function Onboarding({ profile, onComplete }: { profile: UserProfile, onComplete:
 function Sidebar({ view, setView, onLogout, documentCount }: { view: View, setView: (view: View) => void, onLogout: () => void, documentCount: number }) {
   const links: { id: View, label: string, icon: string }[] = [
     { id: 'dashboard', label: 'Overview', icon: '⌂' },
+    { id: 'study-plan', label: 'Study plan', icon: '◎' },
     { id: 'explore', label: 'Explore programs', icon: '⌕' },
     { id: 'shortlist', label: 'Shortlist & compare', icon: '◇' },
     { id: 'scholarships', label: 'Scholarships', icon: '$' },
@@ -491,6 +493,145 @@ function ProgramDetail({ program, score, profile, goBack, goRoadmap, saved, togg
   )
 }
 
+const applicationStatuses: { value: ApplicationStatus, label: string }[] = [
+  { value: 'considering', label: 'Considering' },
+  { value: 'preparing', label: 'Preparing' },
+  { value: 'ready', label: 'Ready to submit' },
+  { value: 'submitted', label: 'Submitted' },
+  { value: 'interview', label: 'Interview / review' },
+  { value: 'offer', label: 'Offer received' },
+  { value: 'rejected', label: 'Not selected' },
+]
+
+function StudyPlan({ profile, documents, savedIds, scores, applications, setApplications, setView, openProgram }: {
+  profile: UserProfile
+  documents: UserDocument[]
+  savedIds: string[]
+  scores: Record<string, ProgramScore>
+  applications: ApplicationRecord[]
+  setApplications: React.Dispatch<React.SetStateAction<ApplicationRecord[]>>
+  setView: (view: View) => void
+  openProgram: (program: Program) => void
+}) {
+  const [activePhase, setActivePhase] = useState<StudyPhaseId>('foundation')
+  const [laterTasks, setLaterTasks] = usePersistentState<Record<string, boolean>>('navigator-later-study-tasks', {})
+  const [toast, setToast] = useState('')
+  const savedPrograms = programs.filter((program) => savedIds.includes(program.id))
+  const documentProgress = documents.filter((item) => item.required && item.status !== 'missing').length
+  const requiredDocuments = documents.filter((item) => item.required).length
+  const submittedCount = applications.filter((item) => ['submitted', 'interview', 'offer'].includes(item.status)).length
+  const offerCount = applications.filter((item) => item.status === 'offer').length
+
+  const progress: Record<StudyPhaseId, number> = {
+    foundation: Math.round((profile.cgpa > 0 ? 25 : 0) + (profile.preferredCountries.length ? 25 : 0) + (profile.annualBudgetBdt > 0 ? 25 : 0) + (profile.preferredIntake ? 25 : 0)),
+    research: Math.min(100, savedIds.length * 20),
+    tests: profile.ieltsStatus === 'completed' ? 100 : profile.ieltsStatus === 'planning' ? 45 : 10,
+    documents: requiredDocuments ? Math.round(documentProgress / requiredDocuments * 100) : 0,
+    funding: profile.sponsorReady ? 70 : applications.some((item) => item.fundingStatus !== 'not-started') ? 45 : 20,
+    applications: applications.length ? Math.round(applications.reduce((total, item) => total + ({ considering: 10, preparing: 35, ready: 60, submitted: 80, interview: 90, offer: 100, rejected: 100 }[item.status]), 0) / applications.length) : 0,
+    visa: offerCount ? Math.round(['visa-finance', 'visa-docs', 'visa-appointment', 'visa-submit'].filter((id) => laterTasks[id]).length / 4 * 100) : 0,
+    departure: offerCount ? Math.round(['housing', 'insurance', 'flight', 'arrival'].filter((id) => laterTasks[id]).length / 4 * 100) : 0,
+  }
+
+  const overall = Math.round(Object.values(progress).reduce((sum, value) => sum + value, 0) / Object.keys(progress).length)
+  const addApplication = (program: Program) => {
+    if (applications.some((item) => item.programId === program.id)) return
+    setApplications((current) => [...current, { programId: program.id, status: 'preparing', fundingStatus: 'not-started', applicationDeadline: program.deadline, notes: '' }])
+    setToast(`${program.university} added to your application tracker.`)
+  }
+  const updateApplication = (programId: string, patch: Partial<ApplicationRecord>) => setApplications((current) => current.map((item) => item.programId === programId ? { ...item, ...patch } : item))
+  const removeApplication = (programId: string) => setApplications((current) => current.filter((item) => item.programId !== programId))
+
+  const phaseAction: Record<StudyPhaseId, { label: string, view: View }> = {
+    foundation: { label: 'Review profile', view: 'profile' },
+    research: { label: 'Manage shortlist', view: 'shortlist' },
+    tests: { label: 'Open roadmap', view: 'roadmap' },
+    documents: { label: 'Open documents', view: 'documents' },
+    funding: { label: 'View scholarships', view: 'scholarships' },
+    applications: { label: 'Application tracker', view: 'study-plan' },
+    visa: { label: 'Visa checklist', view: 'study-plan' },
+    departure: { label: 'Departure checklist', view: 'study-plan' },
+  }
+
+  return (
+    <>
+      <Topbar title="Study plan" />
+      <div className="page-content">
+        {toast && <Toast message={toast} onClose={() => setToast('')} />}
+        <section className="study-plan-hero">
+          <div><span className="eyebrow light">{profile.targetDegree} · {profile.subject} · {profile.preferredIntake}</span><h2>Your complete journey from decision to departure.</h2><p>One workspace for research, preparation, applications, visa and arrival.</p></div>
+          <div className="plan-progress-ring" style={{ background: `conic-gradient(#85dfd3 0 ${overall}%,rgba(255,255,255,.16) ${overall}%)` }}><div><strong>{overall}%</strong><span>overall plan</span></div></div>
+        </section>
+
+        <section className="phase-grid">
+          {studyPhases.map((phase, index) => <button className={`phase-card ${activePhase === phase.id ? 'active' : ''} ${progress[phase.id] === 100 ? 'complete' : ''}`} key={phase.id} onClick={() => setActivePhase(phase.id)}>
+            <div className="phase-card-top"><span className="phase-number">{index + 1}</span><span className="phase-icon">{progress[phase.id] === 100 ? '✓' : phase.icon}</span></div>
+            <strong>{phase.title}</strong><small>{phase.target}</small><div className="phase-progress"><span style={{ width: `${progress[phase.id]}%` }} /></div><em>{progress[phase.id]}%</em>
+          </button>)}
+        </section>
+
+        <section className="phase-focus panel">
+          <div><span className="eyebrow">Current stage</span><h2>{studyPhases.find((phase) => phase.id === activePhase)?.title}</h2><p>{studyPhases.find((phase) => phase.id === activePhase)?.description}</p></div>
+          <div className="phase-focus-score"><strong>{progress[activePhase]}%</strong><span>complete</span><button className="primary small" onClick={() => setView(phaseAction[activePhase].view)}>{phaseAction[activePhase].label} →</button></div>
+        </section>
+
+        <div className="study-plan-layout">
+          <main>
+            <section className="panel application-tracker">
+              <div className="section-title"><div><span className="eyebrow">Application tracker</span><h2>From shortlist to decision</h2></div><div className="application-summary"><span>{applications.length} active</span><span>{submittedCount} submitted</span><span>{offerCount} offers</span></div></div>
+              {applications.length ? <div className="application-list">{applications.map((application) => {
+                const program = programs.find((item) => item.id === application.programId)
+                if (!program) return null
+                return <article className="application-row" key={application.programId}>
+                  <div className="uni-logo" style={{ background: program.accent }}>{program.university.split(' ').map((word) => word[0]).slice(0, 2).join('')}</div>
+                  <div className="application-program"><button onClick={() => openProgram(program)}>{program.university}</button><strong>{program.program}</strong><small>{program.flag} {program.country} · Deadline {application.applicationDeadline}</small></div>
+                  <label>Status<select value={application.status} onChange={(event) => updateApplication(program.id, { status: event.target.value as ApplicationStatus })}>{applicationStatuses.map((status) => <option value={status.value} key={status.value}>{status.label}</option>)}</select></label>
+                  <label>Funding<select value={application.fundingStatus} onChange={(event) => updateApplication(program.id, { fundingStatus: event.target.value as ApplicationRecord['fundingStatus'] })}><option value="not-started">Not started</option><option value="researching">Researching</option><option value="applied">Applied</option><option value="awarded">Awarded</option></select></label>
+                  <button className="application-remove" onClick={() => removeApplication(program.id)}>×</button>
+                </article>
+              })}</div> : <EmptyState title="No active applications" text="Add a shortlisted programme when you are ready to begin preparing its application." />}
+            </section>
+
+            <section className="panel shortlist-to-application">
+              <div className="section-title"><div><span className="eyebrow">Your shortlist</span><h2>Choose what moves into application preparation</h2></div><button className="text-button" onClick={() => setView('shortlist')}>Manage shortlist →</button></div>
+              <div className="application-candidates">{savedPrograms.map((program) => {
+                const alreadyAdded = applications.some((item) => item.programId === program.id)
+                return <div key={program.id}><div><strong>{program.university}</strong><small>{scores[program.id].overall}% match · {formatPreferredCurrency(estimateCost(program, profile).firstYearBdt, profile.preferredCurrency)} first year</small></div><button disabled={alreadyAdded} onClick={() => addApplication(program)}>{alreadyAdded ? 'Added' : 'Start application'}</button></div>
+              })}</div>
+            </section>
+          </main>
+
+          <aside className="study-plan-aside">
+            <section className="panel"><span className="eyebrow">Readiness snapshot</span>{[
+              ['Shortlist', `${savedIds.length}/5`, Math.min(100, savedIds.length * 20)],
+              ['English test', profile.ieltsStatus === 'completed' ? `${profile.ieltsScore}` : 'Pending', progress.tests],
+              ['Required documents', `${documentProgress}/${requiredDocuments}`, progress.documents],
+              ['Funding evidence', profile.sponsorReady ? 'Ready' : 'Pending', profile.sponsorReady ? 100 : 25],
+            ].map(([label, value, score]) => <div className="plan-readiness" key={label}><div><span>{label}</span><strong>{value}</strong></div><div><span style={{ width: `${score}%` }} /></div></div>)}</section>
+
+            <LaterStageChecklist title="Visa preparation" locked={!offerCount} tasks={[
+              ['visa-finance', 'Financial evidence'],
+              ['visa-docs', 'Visa document set'],
+              ['visa-appointment', 'Appointment / biometrics'],
+              ['visa-submit', 'Application submitted'],
+            ]} values={laterTasks} onToggle={(id) => setLaterTasks((current) => ({ ...current, [id]: !current[id] }))} />
+            <LaterStageChecklist title="Pre-departure" locked={!offerCount} tasks={[
+              ['housing', 'Housing confirmed'],
+              ['insurance', 'Insurance arranged'],
+              ['flight', 'Travel booked'],
+              ['arrival', 'Arrival checklist ready'],
+            ]} values={laterTasks} onToggle={(id) => setLaterTasks((current) => ({ ...current, [id]: !current[id] }))} />
+          </aside>
+        </div>
+      </div>
+    </>
+  )
+}
+
+function LaterStageChecklist({ title, locked, tasks, values, onToggle }: { title: string, locked: boolean, tasks: string[][], values: Record<string, boolean>, onToggle: (id: string) => void }) {
+  return <section className={`panel later-checklist ${locked ? 'locked' : ''}`}><div className="section-title"><h2>{title}</h2>{locked && <span className="locked-pill">Unlocks after offer</span>}</div>{tasks.map(([id, label]) => <label key={id}><input type="checkbox" disabled={locked} checked={Boolean(values[id])} onChange={() => onToggle(id)} /><span>{label}</span></label>)}</section>
+}
+
 function Roadmap({ documents }: { documents: UserDocument[] }) {
   const [items, setItems] = usePersistentState<RoadmapItem[]>('navigator-roadmap', initialRoadmap)
   const effectiveItems = items.map((item) => {
@@ -655,6 +796,7 @@ function App() {
   const [compareIds, setCompareIds] = usePersistentState<string[]>('navigator-comparison', ['tum-ds', 'aalto-ml'])
   const [profile, setProfile] = usePersistentState<UserProfile>('navigator-profile', defaultProfile)
   const [documents, setDocuments] = usePersistentState<UserDocument[]>('navigator-documents', defaultDocuments)
+  const [applications, setApplications] = usePersistentState<ApplicationRecord[]>('navigator-applications', [])
   const [appToast, setAppToast] = useState('')
   const normalizedDocuments = useMemo(() => normalizeDocuments(documents), [documents])
   useEffect(() => {
@@ -678,7 +820,7 @@ function App() {
   })
   const resetDemo = () => {
     if (!window.confirm('Reset all prototype profile, document, shortlist, roadmap and adviser data?')) return
-    ;['navigator-profile', 'navigator-documents', 'navigator-shortlist', 'navigator-comparison', 'navigator-roadmap', 'navigator-chat'].forEach((key) => localStorage.removeItem(key))
+    ;['navigator-profile', 'navigator-documents', 'navigator-shortlist', 'navigator-comparison', 'navigator-roadmap', 'navigator-chat', 'navigator-applications', 'navigator-later-study-tasks'].forEach((key) => localStorage.removeItem(key))
     window.location.reload()
   }
 
@@ -688,6 +830,7 @@ function App() {
       <main className="workspace">
         {appToast && <Toast message={appToast} onClose={() => setAppToast('')} />}
         {view === 'dashboard' && <Dashboard setView={setView} openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} profile={profile} scores={scores} notifications={notifications} />}
+        {view === 'study-plan' && <StudyPlan profile={profile} documents={normalizedDocuments} savedIds={savedIds} scores={scores} applications={applications} setApplications={setApplications} setView={setView} openProgram={openProgram} />}
         {view === 'explore' && <Explore openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} openCompare={() => setView('shortlist')} scores={scores} profile={profile} />}
         {view === 'program' && <ProgramDetail program={selectedProgram} score={scores[selectedProgram.id]} profile={profile} goBack={() => setView('explore')} goRoadmap={() => setView('roadmap')} saved={savedIds.includes(selectedProgram.id)} toggleSaved={() => toggleSaved(selectedProgram.id)} />}
         {view === 'shortlist' && <Shortlist savedIds={savedIds} compareIds={compareIds} openProgram={openProgram} toggleSaved={toggleSaved} toggleCompare={toggleCompare} scores={scores} profile={profile} />}
@@ -698,7 +841,7 @@ function App() {
         {view === 'profile' && <><Profile profile={profile} onSave={(updated) => { setProfile(updated); setAppToast('Profile saved. Guidance has been recalculated.') }} /><div className="reset-demo-wrap"><button className="reset-demo" onClick={resetDemo}>Reset all demo data</button></div></>}
       </main>
       <nav className="mobile-nav">
-        {([['dashboard', '⌂', 'Home'], ['explore', '⌕', 'Explore'], ['shortlist', '◇', 'Saved'], ['roadmap', '✓', 'Roadmap'], ['documents', '▤', 'Docs'], ['adviser', '✦', 'Ask']] as [View, string, string][]).map(([id, icon, label]) =>
+        {([['dashboard', '⌂', 'Home'], ['study-plan', '◎', 'Plan'], ['explore', '⌕', 'Explore'], ['shortlist', '◇', 'Saved'], ['documents', '▤', 'Docs'], ['adviser', '✦', 'Ask']] as [View, string, string][]).map(([id, icon, label]) =>
           <button className={view === id || (view === 'program' && id === 'explore') ? 'active' : ''} onClick={() => setView(id)} key={id}><span>{icon}</span>{label}</button>)}
       </nav>
     </div>

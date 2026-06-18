@@ -7,6 +7,7 @@ export type View =
   | 'roadmap'
   | 'adviser'
   | 'documents'
+  | 'study-plan'
   | 'profile'
 
 export type Program = {
@@ -138,4 +139,40 @@ export type UserDocument = {
   fileName?: string
   uploadedAt?: string
   linkedTask: string
+}
+
+export type StudyPhaseId =
+  | 'foundation'
+  | 'research'
+  | 'tests'
+  | 'documents'
+  | 'funding'
+  | 'applications'
+  | 'visa'
+  | 'departure'
+
+export type StudyPhase = {
+  id: StudyPhaseId
+  title: string
+  description: string
+  icon: string
+  target: string
+}
+
+export type ApplicationStatus =
+  | 'considering'
+  | 'preparing'
+  | 'ready'
+  | 'submitted'
+  | 'interview'
+  | 'offer'
+  | 'rejected'
+
+export type ApplicationRecord = {
+  programId: string
+  status: ApplicationStatus
+  fundingStatus: 'not-started' | 'researching' | 'applied' | 'awarded'
+  applicationDeadline: string
+  submittedAt?: string
+  notes: string
 }
