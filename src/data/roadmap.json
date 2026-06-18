@@ -1,0 +1,50 @@
+[
+  {
+    "id": 1,
+    "title": "Validate your target and budget",
+    "description": "Confirm degree, destination preferences and the maximum annual budget with your sponsor.",
+    "due": "Completed 12 Jun",
+    "status": "completed",
+    "category": "Foundation"
+  },
+  {
+    "id": 2,
+    "title": "Build your IELTS preparation plan",
+    "description": "Take a diagnostic test, set a 7.0 target and create a six-week weekly study schedule.",
+    "due": "Due 25 Jun",
+    "status": "current",
+    "category": "English test"
+  },
+  {
+    "id": 3,
+    "title": "Prepare academic documents",
+    "description": "Collect your transcript, provisional certificate, grading scale and course descriptions.",
+    "due": "Due 15 Jul",
+    "status": "upcoming",
+    "category": "Documents"
+  },
+  {
+    "id": 4,
+    "title": "Finalize a five-program shortlist",
+    "description": "Choose a balanced shortlist containing safe, target and ambitious options.",
+    "due": "Due 28 Jul",
+    "status": "upcoming",
+    "category": "Shortlist"
+  },
+  {
+    "id": 5,
+    "title": "Draft your statement of purpose",
+    "description": "Connect your academic preparation, projects and career direction to each target program.",
+    "due": "Due 18 Aug",
+    "status": "upcoming",
+    "category": "Application"
+  },
+  {
+    "id": 6,
+    "title": "Complete funding and sponsor plan",
+    "description": "Document available funds, scholarship targets and the financial evidence timeline.",
+    "due": "Due 30 Aug",
+    "status": "upcoming",
+    "category": "Funding"
+  }
+]
