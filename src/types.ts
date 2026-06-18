@@ -8,6 +8,7 @@ export type View =
   | 'adviser'
   | 'documents'
   | 'study-plan'
+  | 'experts'
   | 'profile'
 
 export type Program = {
@@ -175,4 +176,45 @@ export type ApplicationRecord = {
   applicationDeadline: string
   submittedAt?: string
   notes: string
+}
+
+export type ExpertService = {
+  id: string
+  title: string
+  durationMinutes: number
+  priceUsd: number
+  description: string
+}
+
+export type Expert = {
+  id: string
+  name: string
+  title: string
+  initials: string
+  accent: string
+  rating: number
+  reviews: number
+  experienceYears: number
+  specializations: string[]
+  countries: string[]
+  languages: string[]
+  education: string[]
+  bio: string
+  credentialsUrl: string
+  services: ExpertService[]
+  availability: Record<string, string[]>
+}
+
+export type ConsultationBooking = {
+  id: string
+  expertId: string
+  serviceId: string
+  date: string
+  time: string
+  timezone: string
+  documentIds: string[]
+  caseSummary: string
+  consent: boolean
+  status: 'confirmed' | 'completed' | 'cancelled'
+  expertNotes?: string
 }

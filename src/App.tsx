@@ -7,8 +7,9 @@ import { Autocomplete, MultiAutocomplete } from './components/Autocomplete'
 import { countries, currencies, subjects, universities } from './data/referenceData'
 import { defaultDocuments } from './data/documents'
 import { studyPhases } from './data/studyPlan'
+import { experts } from './data/experts'
 import { bdtToPreferred, buildNotifications, defaultProfile, estimateCost, formatPreferredCurrency, preferredToBdt, scoreProgram } from './lib/personalization'
-import type { ApplicationRecord, ApplicationStatus, AppNotification, ChatMessage, DocumentFile, Program, ProgramScore, RoadmapItem, Scholarship, StudyPhaseId, UserDocument, UserProfile, View } from './types'
+import type { ApplicationRecord, ApplicationStatus, AppNotification, ChatMessage, ConsultationBooking, DocumentFile, Expert, Program, ProgramScore, RoadmapItem, Scholarship, StudyPhaseId, UserDocument, UserProfile, View } from './types'
 import './App.css'
 
 type AuthMode = 'login' | 'signup'
@@ -181,6 +182,7 @@ function Sidebar({ view, setView, onLogout, documentCount }: { view: View, setVi
     { id: 'roadmap', label: 'My roadmap', icon: '✓' },
     { id: 'documents', label: 'Documents', icon: '▤' },
     { id: 'adviser', label: 'Ask Navigator', icon: '✦' },
+    { id: 'experts', label: 'Expert consultations', icon: '◉' },
     { id: 'profile', label: 'My profile', icon: '○' },
   ]
   return (
@@ -632,6 +634,124 @@ function LaterStageChecklist({ title, locked, tasks, values, onToggle }: { title
   return <section className={`panel later-checklist ${locked ? 'locked' : ''}`}><div className="section-title"><h2>{title}</h2>{locked && <span className="locked-pill">Unlocks after offer</span>}</div>{tasks.map(([id, label]) => <label key={id}><input type="checkbox" disabled={locked} checked={Boolean(values[id])} onChange={() => onToggle(id)} /><span>{label}</span></label>)}</section>
 }
 
+function Experts({ profile, documents, bookings, setBookings }: {
+  profile: UserProfile
+  documents: UserDocument[]
+  bookings: ConsultationBooking[]
+  setBookings: React.Dispatch<React.SetStateAction<ConsultationBooking[]>>
+}) {
+  const [specialization, setSpecialization] = useState('All expertise')
+  const [country, setCountry] = useState('All countries')
+  const [selectedExpert, setSelectedExpert] = useState<Expert | null>(null)
+  const [bookingExpert, setBookingExpert] = useState<Expert | null>(null)
+  const [toast, setToast] = useState('')
+  const filtered = experts.filter((expert) =>
+    (specialization === 'All expertise' || expert.specializations.includes(specialization)) &&
+    (country === 'All countries' || expert.countries.includes(country))
+  )
+  const upcoming = bookings.filter((booking) => booking.status === 'confirmed')
+  const previous = bookings.filter((booking) => booking.status !== 'confirmed')
+
+  const updateBooking = (id: string, patch: Partial<ConsultationBooking>) => setBookings((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item))
+
+  return (
+    <>
+      <Topbar title="Expert consultations" />
+      <div className="page-content">
+        {toast && <Toast message={toast} onClose={() => setToast('')} />}
+        <section className="expert-hero"><div><span className="eyebrow light">Human guidance, when it matters</span><h2>Bring an expert into your study plan.</h2><p>Book a focused review with your profile, shortlist and selected documents already organized.</p></div><div><strong>{experts.length}</strong><span>prototype experts</span></div></section>
+
+        {upcoming.length > 0 && <section className="upcoming-consultations panel">
+          <div className="section-title"><div><span className="eyebrow">Upcoming</span><h2>Your booked consultations</h2></div></div>
+          <div className="booking-list">{upcoming.map((booking) => {
+            const expert = experts.find((item) => item.id === booking.expertId)
+            const service = expert?.services.find((item) => item.id === booking.serviceId)
+            if (!expert || !service) return null
+            return <article className="booking-row" key={booking.id}><div className="expert-avatar small" style={{ background: expert.accent }}>{expert.initials}</div><div><strong>{service.title}</strong><span>{expert.name}</span><small>{booking.date} · {booking.time} · {booking.timezone}</small></div><div className="shared-count">▤ {booking.documentIds.length} shared</div><button onClick={() => { updateBooking(booking.id, { status: 'cancelled' }); setToast('Consultation cancelled in the prototype.') }}>Cancel</button></article>
+          })}</div>
+        </section>}
+
+        <div className="expert-toolbar">
+          <div><select value={specialization} onChange={(event) => setSpecialization(event.target.value)}><option>All expertise</option>{[...new Set(experts.flatMap((expert) => expert.specializations))].map((item) => <option key={item}>{item}</option>)}</select><select value={country} onChange={(event) => setCountry(event.target.value)}><option>All countries</option>{[...new Set(experts.flatMap((expert) => expert.countries))].sort().map((item) => <option key={item}>{item}</option>)}</select></div><span>{filtered.length} experts</span>
+        </div>
+
+        <div className="expert-grid">{filtered.map((expert) => {
+          const startingPrice = Math.min(...expert.services.map((service) => service.priceUsd))
+          return <article className="expert-card" key={expert.id}>
+            <div className="expert-card-head"><div className="expert-avatar" style={{ background: expert.accent }}>{expert.initials}</div><div className="rating">★ {expert.rating}<small>({expert.reviews})</small></div></div>
+            <span className="eyebrow">{expert.specializations[0]}</span><h3>{expert.name}</h3><p className="expert-title">{expert.title}</p><p className="expert-bio">{expert.bio}</p>
+            <div className="expert-tags">{expert.countries.slice(0, 4).map((item) => <span key={item}>{item}</span>)}</div>
+            <div className="expert-facts"><div><small>Experience</small><strong>{expert.experienceYears} years</strong></div><div><small>Languages</small><strong>{expert.languages.join(', ')}</strong></div></div>
+            <div className="expert-card-footer"><div><small>From</small><strong>{formatUsd(startingPrice, profile.preferredCurrency)}</strong></div><button className="secondary" onClick={() => setSelectedExpert(expert)}>View profile</button><button className="primary" onClick={() => setBookingExpert(expert)}>Book</button></div>
+          </article>
+        })}</div>
+
+        {previous.length > 0 && <section className="consultation-history panel"><span className="eyebrow">History</span><h2>Previous and cancelled consultations</h2>{previous.map((booking) => {
+          const expert = experts.find((item) => item.id === booking.expertId)
+          return <div key={booking.id}><strong>{expert?.name}</strong><span>{booking.date} · {booking.status}</span></div>
+        })}</section>}
+      </div>
+      {selectedExpert && <ExpertProfileModal expert={selectedExpert} profile={profile} onClose={() => setSelectedExpert(null)} onBook={() => { setBookingExpert(selectedExpert); setSelectedExpert(null) }} />}
+      {bookingExpert && <BookingModal expert={bookingExpert} profile={profile} documents={documents} onClose={() => setBookingExpert(null)} onConfirm={(booking) => { setBookings((current) => [...current, booking]); setBookingExpert(null); setToast('Consultation booked successfully.') }} />}
+    </>
+  )
+}
+
+function ExpertProfileModal({ expert, profile, onClose, onBook }: { expert: Expert, profile: UserProfile, onClose: () => void, onBook: () => void }) {
+  return <div className="modal-backdrop" onMouseDown={onClose}><section className="expert-profile-modal" onMouseDown={(event) => event.stopPropagation()}>
+    <button className="modal-close" onClick={onClose}>×</button>
+    <div className="expert-profile-head"><div className="expert-avatar large" style={{ background: expert.accent }}>{expert.initials}</div><div><span className="eyebrow">{expert.specializations.join(' · ')}</span><h2>{expert.name}</h2><p>{expert.title}</p><div className="profile-rating">★ {expert.rating} from {expert.reviews} reviews · {expert.experienceYears} years experience</div></div></div>
+    <p className="modal-bio">{expert.bio}</p>
+    <div className="expert-profile-grid"><div><span className="eyebrow">Destination coverage</span><div className="expert-tags">{expert.countries.map((item) => <span key={item}>{item}</span>)}</div></div><div><span className="eyebrow">Education & background</span>{expert.education.map((item) => <p className="credential-line" key={item}>✓ {item}</p>)}</div></div>
+    <ExternalLink href={expert.credentialsUrl}>View public credential reference</ExternalLink>
+    <div className="service-preview"><span className="eyebrow">Available services</span>{expert.services.map((service) => <div key={service.id}><div><strong>{service.title}</strong><small>{service.durationMinutes} minutes · {service.description}</small></div><strong>{formatUsd(service.priceUsd, profile.preferredCurrency)}</strong></div>)}</div>
+    <button className="primary wide" onClick={onBook}>Choose a service and book →</button>
+  </section></div>
+}
+
+function BookingModal({ expert, profile, documents, onClose, onConfirm }: { expert: Expert, profile: UserProfile, documents: UserDocument[], onClose: () => void, onConfirm: (booking: ConsultationBooking) => void }) {
+  const [step, setStep] = useState(1)
+  const [serviceId, setServiceId] = useState(expert.services[0].id)
+  const dates = Object.keys(expert.availability)
+  const [date, setDate] = useState(dates[0])
+  const [time, setTime] = useState(expert.availability[dates[0]][0])
+  const [selectedDocuments, setSelectedDocuments] = useState<string[]>(documents.filter((item) => item.status !== 'missing').map((item) => item.id).slice(0, 2))
+  const [summary, setSummary] = useState(`I want expert guidance on my ${profile.targetDegree} ${profile.subject} plan for ${profile.preferredIntake}. My preferred destinations are ${profile.preferredCountries.join(', ')}.`)
+  const [consent, setConsent] = useState(false)
+  const service = expert.services.find((item) => item.id === serviceId) ?? expert.services[0]
+  const availableDocuments = documents.filter((item) => item.status !== 'missing')
+
+  const confirm = () => {
+    if (!consent) return
+    onConfirm({
+      id: `booking-${expert.id}-${date}-${time}`,
+      expertId: expert.id,
+      serviceId,
+      date,
+      time,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      documentIds: selectedDocuments,
+      caseSummary: summary,
+      consent,
+      status: 'confirmed',
+    })
+  }
+
+  return <div className="modal-backdrop"><section className="booking-modal">
+    <button className="modal-close" onClick={onClose}>×</button>
+    <div className="booking-heading"><span className="eyebrow">Book consultation · Step {step} of 4</span><h2>{expert.name}</h2><div className="booking-stepper">{[1, 2, 3, 4].map((item) => <span className={item <= step ? 'active' : ''} key={item} />)}</div></div>
+    {step === 1 && <div className="booking-content"><h3>Choose a service</h3><div className="service-choice">{expert.services.map((item) => <button className={serviceId === item.id ? 'selected' : ''} onClick={() => setServiceId(item.id)} key={item.id}><div><strong>{item.title}</strong><small>{item.durationMinutes} minutes · {item.description}</small></div><strong>{formatUsd(item.priceUsd, profile.preferredCurrency)}</strong></button>)}</div></div>}
+    {step === 2 && <div className="booking-content"><h3>Select a date and time</h3><div className="date-choice">{dates.map((item) => <button className={date === item ? 'selected' : ''} onClick={() => { setDate(item); setTime(expert.availability[item][0]) }} key={item}>{item}</button>)}</div><div className="time-choice">{expert.availability[date].map((item) => <button className={time === item ? 'selected' : ''} onClick={() => setTime(item)} key={item}>{item}</button>)}</div><small className="timezone-note">Times will be treated as {Intl.DateTimeFormat().resolvedOptions().timeZone} for this prototype.</small></div>}
+    {step === 3 && <div className="booking-content"><h3>Prepare the expert case</h3><label className="case-summary">Case summary<textarea value={summary} onChange={(event) => setSummary(event.target.value)} /></label><span className="eyebrow">Documents to share</span>{availableDocuments.length ? <div className="share-documents">{availableDocuments.map((document) => <label key={document.id}><input type="checkbox" checked={selectedDocuments.includes(document.id)} onChange={() => setSelectedDocuments((current) => current.includes(document.id) ? current.filter((id) => id !== document.id) : [...current, document.id])} /><div><strong>{document.title}</strong><small>{document.files.length} file(s) · {document.status}</small></div></label>)}</div> : <p className="muted">No documents are available to share. You can still book the consultation.</p>}</div>}
+    {step === 4 && <div className="booking-content booking-review"><h3>Review and consent</h3><div className="review-grid"><div><small>Service</small><strong>{service.title}</strong></div><div><small>Price</small><strong>{formatUsd(service.priceUsd, profile.preferredCurrency)}</strong></div><div><small>Schedule</small><strong>{date} · {time}</strong></div><div><small>Documents</small><strong>{selectedDocuments.length} selected</strong></div></div><div className="case-preview"><small>Case summary</small><p>{summary}</p></div><label className="consent-box"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} /><span>I consent to sharing this case summary and the selected prototype document metadata with {expert.name} for this consultation. No actual file contents are transmitted in this prototype.</span></label></div>}
+    <div className="booking-actions"><button className="text-button" disabled={step === 1} onClick={() => setStep((value) => value - 1)}>← Back</button>{step < 4 ? <button className="primary" onClick={() => setStep((value) => value + 1)}>Continue →</button> : <button className="primary" disabled={!consent} onClick={confirm}>Confirm mock booking</button>}</div>
+  </section></div>
+}
+
+function formatUsd(valueUsd: number, currencyCode: string) {
+  return formatPreferredCurrency(valueUsd * 122, currencyCode)
+}
+
 function Roadmap({ documents }: { documents: UserDocument[] }) {
   const [items, setItems] = usePersistentState<RoadmapItem[]>('navigator-roadmap', initialRoadmap)
   const effectiveItems = items.map((item) => {
@@ -797,6 +917,7 @@ function App() {
   const [profile, setProfile] = usePersistentState<UserProfile>('navigator-profile', defaultProfile)
   const [documents, setDocuments] = usePersistentState<UserDocument[]>('navigator-documents', defaultDocuments)
   const [applications, setApplications] = usePersistentState<ApplicationRecord[]>('navigator-applications', [])
+  const [bookings, setBookings] = usePersistentState<ConsultationBooking[]>('navigator-consultations', [])
   const [appToast, setAppToast] = useState('')
   const normalizedDocuments = useMemo(() => normalizeDocuments(documents), [documents])
   useEffect(() => {
@@ -820,7 +941,7 @@ function App() {
   })
   const resetDemo = () => {
     if (!window.confirm('Reset all prototype profile, document, shortlist, roadmap and adviser data?')) return
-    ;['navigator-profile', 'navigator-documents', 'navigator-shortlist', 'navigator-comparison', 'navigator-roadmap', 'navigator-chat', 'navigator-applications', 'navigator-later-study-tasks'].forEach((key) => localStorage.removeItem(key))
+    ;['navigator-profile', 'navigator-documents', 'navigator-shortlist', 'navigator-comparison', 'navigator-roadmap', 'navigator-chat', 'navigator-applications', 'navigator-later-study-tasks', 'navigator-consultations'].forEach((key) => localStorage.removeItem(key))
     window.location.reload()
   }
 
@@ -838,10 +959,11 @@ function App() {
         {view === 'roadmap' && <Roadmap documents={normalizedDocuments} />}
         {view === 'documents' && <Documents documents={normalizedDocuments} onChange={setDocuments} onProfileUpdate={(update) => { setProfile((current) => ({ ...current, ...update })); setAppToast('Profile readiness updated from document status.') }} setView={setView} />}
         {view === 'adviser' && <Adviser />}
+        {view === 'experts' && <Experts profile={profile} documents={normalizedDocuments} bookings={bookings} setBookings={setBookings} />}
         {view === 'profile' && <><Profile profile={profile} onSave={(updated) => { setProfile(updated); setAppToast('Profile saved. Guidance has been recalculated.') }} /><div className="reset-demo-wrap"><button className="reset-demo" onClick={resetDemo}>Reset all demo data</button></div></>}
       </main>
       <nav className="mobile-nav">
-        {([['dashboard', '⌂', 'Home'], ['study-plan', '◎', 'Plan'], ['explore', '⌕', 'Explore'], ['shortlist', '◇', 'Saved'], ['documents', '▤', 'Docs'], ['adviser', '✦', 'Ask']] as [View, string, string][]).map(([id, icon, label]) =>
+        {([['dashboard', '⌂', 'Home'], ['study-plan', '◎', 'Plan'], ['explore', '⌕', 'Explore'], ['shortlist', '◇', 'Saved'], ['documents', '▤', 'Docs'], ['experts', '◉', 'Experts']] as [View, string, string][]).map(([id, icon, label]) =>
           <button className={view === id || (view === 'program' && id === 'explore') ? 'active' : ''} onClick={() => setView(id)} key={id}><span>{icon}</span>{label}</button>)}
       </nav>
     </div>
