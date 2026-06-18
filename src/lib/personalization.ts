@@ -1,4 +1,4 @@
-import type { AppNotification, CostEstimate, Program, ProgramScore, UserProfile } from '../types'
+import type { AppNotification, CostEstimate, Program, ProgramScore, UserDocument, UserProfile } from '../types'
 import { currencies } from '../data/referenceData'
 
 export const defaultProfile: UserProfile = {
@@ -72,7 +72,7 @@ export function scoreProgram(program: Program, profile: UserProfile): ProgramSco
   return { overall, academic, budget, destination, english, funding, reasons }
 }
 
-export function buildNotifications(profile: UserProfile, strongest: Program): AppNotification[] {
+export function buildNotifications(profile: UserProfile, strongest: Program, documents: UserDocument[] = []): AppNotification[] {
   const notifications: AppNotification[] = [
     {
       id: 'new-match',
@@ -96,7 +96,8 @@ export function buildNotifications(profile: UserProfile, strongest: Program): Ap
     type: 'profile',
     action: 'profile',
   })
-  if (!profile.transcriptReady) notifications.push({
+  const transcript = documents.find((item) => item.id === 'transcript')
+  if (!profile.transcriptReady || !transcript || transcript.status === 'missing') notifications.push({
     id: 'transcript',
     title: 'Academic transcript is still marked incomplete',
     detail: 'Update your document readiness before application season.',

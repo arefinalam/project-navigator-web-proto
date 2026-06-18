@@ -6,6 +6,7 @@ export type View =
   | 'scholarships'
   | 'roadmap'
   | 'adviser'
+  | 'documents'
   | 'profile'
 
 export type Program = {
@@ -114,4 +115,27 @@ export type AppNotification = {
   detail: string
   type: 'deadline' | 'profile' | 'funding' | 'recommendation'
   action: View
+}
+
+export type DocumentType = 'transcript' | 'cv' | 'ielts' | 'reference' | 'training' | 'other' | string
+
+export type DocumentFile = {
+  id: string
+  name: string
+  addedAt: string
+}
+
+export type UserDocument = {
+  id: DocumentType
+  title: string
+  description: string
+  required: boolean
+  status: 'missing' | 'uploaded' | 'verified'
+  category: 'academic' | 'application' | 'supporting'
+  files: DocumentFile[]
+  custom?: boolean
+  // Legacy fields are retained so existing browser data can be migrated.
+  fileName?: string
+  uploadedAt?: string
+  linkedTask: string
 }

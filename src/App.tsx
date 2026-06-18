@@ -1,12 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import programsData from './data/programs.json'
 import roadmapData from './data/roadmap.json'
 import scholarshipsData from './data/scholarships.json'
 import { usePersistentState } from './hooks/usePersistentState'
 import { Autocomplete, MultiAutocomplete } from './components/Autocomplete'
 import { countries, currencies, subjects, universities } from './data/referenceData'
+import { defaultDocuments } from './data/documents'
 import { bdtToPreferred, buildNotifications, defaultProfile, estimateCost, formatPreferredCurrency, preferredToBdt, scoreProgram } from './lib/personalization'
-import type { AppNotification, ChatMessage, Program, ProgramScore, RoadmapItem, Scholarship, UserProfile, View } from './types'
+import type { AppNotification, ChatMessage, DocumentFile, Program, ProgramScore, RoadmapItem, Scholarship, UserDocument, UserProfile, View } from './types'
 import './App.css'
 
 type AuthMode = 'login' | 'signup'
@@ -14,6 +15,21 @@ type AuthMode = 'login' | 'signup'
 const programs = programsData as Program[]
 const initialRoadmap = roadmapData as RoadmapItem[]
 const scholarships = scholarshipsData as Scholarship[]
+
+function normalizeDocuments(saved: UserDocument[]) {
+  const normalized = defaultDocuments.map((template) => {
+    const current = saved.find((item) => item.id === template.id)
+    if (!current) return template
+    const files = current.files ?? (current.fileName ? [{ id: `${current.id}-legacy`, name: current.fileName, addedAt: current.uploadedAt ?? 'Previously added' }] : [])
+    return { ...template, ...current, files, status: files.length ? current.status : 'missing' } as UserDocument
+  })
+  const custom = saved.filter((item) => item.custom).map((item) => ({
+    ...item,
+    category: item.category ?? 'supporting',
+    files: item.files ?? (item.fileName ? [{ id: `${item.id}-legacy`, name: item.fileName, addedAt: item.uploadedAt ?? 'Previously added' }] : []),
+  }))
+  return [...normalized, ...custom]
+}
 
 function Logo() {
   return (
@@ -154,13 +170,14 @@ function Onboarding({ profile, onComplete }: { profile: UserProfile, onComplete:
   )
 }
 
-function Sidebar({ view, setView, onLogout }: { view: View, setView: (view: View) => void, onLogout: () => void }) {
+function Sidebar({ view, setView, onLogout, documentCount }: { view: View, setView: (view: View) => void, onLogout: () => void, documentCount: number }) {
   const links: { id: View, label: string, icon: string }[] = [
     { id: 'dashboard', label: 'Overview', icon: '⌂' },
     { id: 'explore', label: 'Explore programs', icon: '⌕' },
     { id: 'shortlist', label: 'Shortlist & compare', icon: '◇' },
     { id: 'scholarships', label: 'Scholarships', icon: '$' },
     { id: 'roadmap', label: 'My roadmap', icon: '✓' },
+    { id: 'documents', label: 'Documents', icon: '▤' },
     { id: 'adviser', label: 'Ask Navigator', icon: '✦' },
     { id: 'profile', label: 'My profile', icon: '○' },
   ]
@@ -169,7 +186,7 @@ function Sidebar({ view, setView, onLogout }: { view: View, setView: (view: View
       <Logo />
       <nav>
         <span className="nav-label">Workspace</span>
-        {links.map((link) => <button key={link.id} className={view === link.id || (view === 'program' && link.id === 'explore') ? 'active' : ''} onClick={() => setView(link.id)}><span>{link.icon}</span>{link.label}</button>)}
+        {links.map((link) => <button key={link.id} className={view === link.id || (view === 'program' && link.id === 'explore') ? 'active' : ''} onClick={() => setView(link.id)}><span>{link.icon}</span>{link.label}{link.id === 'documents' && documentCount > 0 && <em className="nav-badge">{documentCount}</em>}</button>)}
       </nav>
       <div className="sidebar-bottom">
         <div className="mini-profile"><span>SR</span><div><strong>Samira Rahman</strong><small>Essential plan</small></div></div>
@@ -474,9 +491,13 @@ function ProgramDetail({ program, score, profile, goBack, goRoadmap, saved, togg
   )
 }
 
-function Roadmap() {
+function Roadmap({ documents }: { documents: UserDocument[] }) {
   const [items, setItems] = usePersistentState<RoadmapItem[]>('navigator-roadmap', initialRoadmap)
-  const complete = items.filter((item) => item.status === 'completed').length
+  const effectiveItems = items.map((item) => {
+    const linkedDocument = documents.find((document) => document.linkedTask === item.title)
+    return linkedDocument && linkedDocument.status === 'verified' ? { ...item, status: 'completed' as const } : item
+  })
+  const complete = effectiveItems.filter((item) => item.status === 'completed').length
   const toggle = (id: number) => setItems((current) => current.map((item) => item.id === id ? { ...item, status: item.status === 'completed' ? 'current' : 'completed' } : item))
   return (
     <>
@@ -485,9 +506,9 @@ function Roadmap() {
         <section className="roadmap-head"><div><span className="eyebrow">MSc Data Science · Fall 2027</span><h2>Your path from profile to application.</h2><p>We’ll adjust the sequence as your profile and deadlines change.</p></div><div className="roadmap-progress"><strong>{complete}/{items.length}</strong><span>tasks complete</span></div></section>
         <div className="roadmap-layout">
           <section className="roadmap-list">
-            {items.map((item, index) => <article className={`roadmap-item ${item.status}`} key={item.id}>
+            {effectiveItems.map((item, index) => <article className={`roadmap-item ${item.status}`} key={item.id}>
               <div className="timeline"><button onClick={() => toggle(item.id)}>{item.status === 'completed' ? '✓' : index + 1}</button><span /></div>
-              <div className="roadmap-copy"><div><span className="category">{item.category}</span><span className="roadmap-due">{item.due}</span></div><h3>{item.title}</h3><p>{item.description}</p>{item.status === 'current' && <button className="primary small">Continue task →</button>}</div>
+              <div className="roadmap-copy"><div><span className="category">{item.category}</span><span className="roadmap-due">{item.due}</span></div><h3>{item.title}</h3><p>{item.description}</p>{documents.some((document) => document.linkedTask === item.title && document.status !== 'missing') && <span className="evidence-badge">▤ Document evidence added</span>}{item.status === 'current' && <button className="primary small">Continue task →</button>}</div>
             </article>)}
           </section>
           <aside className="roadmap-aside"><section className="panel"><span className="eyebrow">Readiness breakdown</span>{[['Academic profile', 88], ['English test', 35], ['Documents', 62], ['Funding plan', 48]].map(([label, score]) => <div className="skill-progress" key={label}><div><span>{label}</span><strong>{score}%</strong></div><div><span style={{ width: `${score}%` }} /></div></div>)}</section><section className="advisor-card"><span>✦</span><h3>Need a hand?</h3><p>Ask your AI guide to explain a task or help you make a decision.</p><button>Ask Navigator</button></section></aside>
@@ -495,6 +516,100 @@ function Roadmap() {
       </div>
     </>
   )
+}
+
+function Documents({ documents, onChange, onProfileUpdate, setView }: {
+  documents: UserDocument[]
+  onChange: (documents: UserDocument[]) => void
+  onProfileUpdate: (update: Partial<UserProfile>) => void
+  setView: (view: View) => void
+}) {
+  const [toast, setToast] = useState('')
+  const [newFolderName, setNewFolderName] = useState('')
+  const completed = documents.filter((item) => item.status !== 'missing').length
+  const update = (id: UserDocument['id'], patch: Partial<UserDocument>) => {
+    const updated = documents.map((item) => item.id === id ? { ...item, ...patch } : item)
+    onChange(updated)
+    if (id === 'transcript') onProfileUpdate({ transcriptReady: patch.status !== 'missing' })
+    if (id === 'ielts' && patch.status === 'verified') onProfileUpdate({ ieltsStatus: 'completed', ieltsScore: 7 })
+  }
+  const upload = (document: UserDocument, selectedFiles?: FileList | null) => {
+    const incoming: DocumentFile[] = selectedFiles?.length
+      ? Array.from(selectedFiles).map((file, index) => ({ id: `${document.id}-${document.files.length + index}-${file.name}`, name: file.name, addedAt: 'Today' }))
+      : [{ id: `${document.id}-${document.files.length}-sample`, name: `${document.id}-sample-document.pdf`, addedAt: 'Today' }]
+    update(document.id, { status: 'uploaded', files: [...document.files, ...incoming], fileName: undefined, uploadedAt: undefined })
+    setToast(`${incoming.length} file${incoming.length > 1 ? 's' : ''} added to ${document.title}.`)
+  }
+  const removeFile = (document: UserDocument, fileId: string) => {
+    const files = document.files.filter((file) => file.id !== fileId)
+    update(document.id, { files, status: files.length ? 'uploaded' : 'missing', fileName: undefined, uploadedAt: undefined })
+    setToast(`File removed from ${document.title}.`)
+  }
+  const addCustomFolder = () => {
+    const title = newFolderName.trim()
+    if (!title) return
+    onChange([...documents, {
+      id: `custom-${Date.now()}`,
+      title,
+      description: 'Custom supporting-document folder.',
+      required: false,
+      status: 'missing',
+      category: 'supporting',
+      files: [],
+      custom: true,
+      linkedTask: 'Finalize a five-program shortlist',
+    }])
+    setNewFolderName('')
+    setToast(`${title} folder created.`)
+  }
+  const removeFolder = (document: UserDocument) => {
+    if (!document.custom || !window.confirm(`Remove the "${document.title}" folder and its prototype file records?`)) return
+    onChange(documents.filter((item) => item.id !== document.id))
+    setToast(`${document.title} folder removed.`)
+  }
+
+  const sections = [
+    { id: 'academic', title: 'Academic records', description: 'Transcripts, language tests and other formal academic evidence.' },
+    { id: 'application', title: 'Application documents', description: 'Documents used directly across applications and expert reviews.' },
+    { id: 'supporting', title: 'Other supporting documents', description: 'References, training certificates, awards, portfolios and additional evidence.' },
+  ] as const
+
+  return (
+    <>
+      <Topbar title="Document center" />
+      <div className="page-content">
+        {toast && <Toast message={toast} onClose={() => setToast('')} />}
+        <section className="document-hero"><div><span className="eyebrow light">Evidence workspace</span><h2>Keep the documents behind your profile in one place.</h2><p>Prototype uploads store only a filename and status in this browser. No file content is uploaded anywhere.</p></div><div className="document-completion"><strong>{completed}/{documents.length}</strong><span>documents added</span></div></section>
+        <div className="document-summary">
+          <div><span className="summary-dot verified-dot" /><strong>{documents.filter((item) => item.status === 'verified').length}</strong><small>Verified</small></div>
+          <div><span className="summary-dot upload-dot" /><strong>{documents.filter((item) => item.status === 'uploaded').length}</strong><small>Awaiting review</small></div>
+          <div><span className="summary-dot missing-dot" /><strong>{documents.filter((item) => item.status === 'missing').length}</strong><small>Missing</small></div>
+        </div>
+        {sections.map((section) => <section className="document-section" key={section.id}>
+          <div className="document-section-head"><div><span className="eyebrow">{section.title}</span><h2>{section.description}</h2></div>{section.id === 'supporting' && <div className="custom-folder-form"><input value={newFolderName} onChange={(event) => setNewFolderName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') addCustomFolder() }} placeholder="New document folder name" /><button onClick={addCustomFolder}>Add folder</button></div>}</div>
+          <div className="document-list">
+          {documents.filter((document) => document.category === section.id).map((document) => <article className="document-card" key={document.id}>
+            <div className={`document-icon ${document.status}`}>▤</div>
+            <div className="document-copy"><div className="document-title-row"><h3>{document.title}</h3><span className={`status-pill ${document.status}`}>{document.status}</span>{document.required && <span className="required-pill">Required</span>}</div><p>{document.description}</p>
+              {document.files.length ? <div className="file-record-list">{document.files.map((file) => <div className="file-record" key={file.id}><span>▤</span><div><strong>{file.name}</strong><small>Added {file.addedAt}</small></div><button onClick={() => removeFile(document, file.id)} aria-label={`Remove ${file.name}`}>×</button></div>)}</div> : <small className="missing-copy">No files have been added.</small>}
+              <button className="task-link" onClick={() => setView('roadmap')}>Linked roadmap task: {document.linkedTask} →</button>
+            </div>
+            <div className="document-actions">
+              <label className="upload-button">{document.files.length ? 'Add more files' : 'Choose files'}<input type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={(event) => { upload(document, event.target.files); event.target.value = '' }} /></label>
+              {document.status === 'uploaded' && <button className="verify-button" onClick={() => { update(document.id, { status: 'verified' }); setToast(`${document.title} marked as verified.`) }}>Mark verified</button>}
+              {document.custom && <button className="remove-button" onClick={() => removeFolder(document)}>Remove folder</button>}
+            </div>
+          </article>)}
+          </div>
+        </section>)}
+        <section className="privacy-note"><span>i</span><div><strong>Prototype privacy behavior</strong><p>The browser reads the selected filename only. We do not store, transmit or inspect the file. A production version would require encrypted storage, malware scanning, permissions and retention controls.</p></div></section>
+      </div>
+    </>
+  )
+}
+
+function Toast({ message, onClose }: { message: string, onClose: () => void }) {
+  return <div className="toast"><span>✓</span><strong>{message}</strong><button onClick={onClose}>×</button></div>
 }
 
 function Profile({ profile, onSave }: { profile: UserProfile, onSave: (profile: UserProfile) => void }) {
@@ -539,9 +654,16 @@ function App() {
   const [savedIds, setSavedIds] = usePersistentState<string[]>('navigator-shortlist', ['tum-ds', 'aalto-ml'])
   const [compareIds, setCompareIds] = usePersistentState<string[]>('navigator-comparison', ['tum-ds', 'aalto-ml'])
   const [profile, setProfile] = usePersistentState<UserProfile>('navigator-profile', defaultProfile)
+  const [documents, setDocuments] = usePersistentState<UserDocument[]>('navigator-documents', defaultDocuments)
+  const [appToast, setAppToast] = useState('')
+  const normalizedDocuments = useMemo(() => normalizeDocuments(documents), [documents])
+  useEffect(() => {
+    if (JSON.stringify(documents) !== JSON.stringify(normalizedDocuments)) setDocuments(normalizedDocuments)
+  }, [documents, normalizedDocuments, setDocuments])
   const scores = useMemo(() => Object.fromEntries(programs.map((program) => [program.id, scoreProgram(program, profile)])) as Record<string, ProgramScore>, [profile])
   const strongestProgram = useMemo(() => [...programs].sort((a, b) => scores[b.id].overall - scores[a.id].overall)[0], [scores])
-  const notifications = useMemo(() => buildNotifications(profile, strongestProgram), [profile, strongestProgram])
+  const notifications = useMemo(() => buildNotifications(profile, strongestProgram, normalizedDocuments), [profile, strongestProgram, normalizedDocuments])
+  const missingDocuments = normalizedDocuments.filter((item) => item.required && item.status === 'missing').length
 
   if (!authenticated) return <AuthScreen onAuthenticated={(isNew) => { setAuthenticated(true); if (isNew) setOnboarded(false) }} />
   if (!onboarded) return <Onboarding profile={profile} onComplete={(updatedProfile) => { setProfile(updatedProfile); localStorage.setItem('navigator-onboarded', 'true'); setOnboarded(true) }} />
@@ -554,22 +676,29 @@ function App() {
     if (current.length >= 3) return [...current.slice(1), id]
     return [...current, id]
   })
+  const resetDemo = () => {
+    if (!window.confirm('Reset all prototype profile, document, shortlist, roadmap and adviser data?')) return
+    ;['navigator-profile', 'navigator-documents', 'navigator-shortlist', 'navigator-comparison', 'navigator-roadmap', 'navigator-chat'].forEach((key) => localStorage.removeItem(key))
+    window.location.reload()
+  }
 
   return (
     <div className="app-shell">
-      <Sidebar view={view} setView={setView} onLogout={logout} />
+      <Sidebar view={view} setView={setView} onLogout={logout} documentCount={missingDocuments} />
       <main className="workspace">
+        {appToast && <Toast message={appToast} onClose={() => setAppToast('')} />}
         {view === 'dashboard' && <Dashboard setView={setView} openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} profile={profile} scores={scores} notifications={notifications} />}
         {view === 'explore' && <Explore openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} openCompare={() => setView('shortlist')} scores={scores} profile={profile} />}
         {view === 'program' && <ProgramDetail program={selectedProgram} score={scores[selectedProgram.id]} profile={profile} goBack={() => setView('explore')} goRoadmap={() => setView('roadmap')} saved={savedIds.includes(selectedProgram.id)} toggleSaved={() => toggleSaved(selectedProgram.id)} />}
         {view === 'shortlist' && <Shortlist savedIds={savedIds} compareIds={compareIds} openProgram={openProgram} toggleSaved={toggleSaved} toggleCompare={toggleCompare} scores={scores} profile={profile} />}
         {view === 'scholarships' && <Scholarships openProgram={openProgram} />}
-        {view === 'roadmap' && <Roadmap />}
+        {view === 'roadmap' && <Roadmap documents={normalizedDocuments} />}
+        {view === 'documents' && <Documents documents={normalizedDocuments} onChange={setDocuments} onProfileUpdate={(update) => { setProfile((current) => ({ ...current, ...update })); setAppToast('Profile readiness updated from document status.') }} setView={setView} />}
         {view === 'adviser' && <Adviser />}
-        {view === 'profile' && <Profile profile={profile} onSave={setProfile} />}
+        {view === 'profile' && <><Profile profile={profile} onSave={(updated) => { setProfile(updated); setAppToast('Profile saved. Guidance has been recalculated.') }} /><div className="reset-demo-wrap"><button className="reset-demo" onClick={resetDemo}>Reset all demo data</button></div></>}
       </main>
       <nav className="mobile-nav">
-        {([['dashboard', '⌂', 'Home'], ['explore', '⌕', 'Explore'], ['shortlist', '◇', 'Saved'], ['roadmap', '✓', 'Roadmap'], ['adviser', '✦', 'Ask']] as [View, string, string][]).map(([id, icon, label]) =>
+        {([['dashboard', '⌂', 'Home'], ['explore', '⌕', 'Explore'], ['shortlist', '◇', 'Saved'], ['roadmap', '✓', 'Roadmap'], ['documents', '▤', 'Docs'], ['adviser', '✦', 'Ask']] as [View, string, string][]).map(([id, icon, label]) =>
           <button className={view === id || (view === 'program' && id === 'explore') ? 'active' : ''} onClick={() => setView(id)} key={id}><span>{icon}</span>{label}</button>)}
       </nav>
     </div>
