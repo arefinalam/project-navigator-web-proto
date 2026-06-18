@@ -10,6 +10,9 @@
 .primary.small { padding:9px 14px; font-size:13px; }
 .secondary { background:white; color:var(--ink); border:1px solid var(--line); padding:11px 17px; }
 .text-button { background:transparent; color:var(--blue); padding:8px; }
+.external-link { color:var(--blue); text-decoration:none; font-weight:800; font-size:10px; }
+.external-link:hover { text-decoration:underline; }
+.external-link span { display:inline-block; margin-left:2px; }
 
 .auth-page { min-height:100vh; display:grid; grid-template-columns:minmax(420px,1.1fr) minmax(440px,.9fr); background:white; }
 .auth-story { position:relative; overflow:hidden; padding:54px 64px; color:white; background:linear-gradient(145deg,#102a49 0%,#19426a 57%,#0c766e 145%); display:flex; flex-direction:column; justify-content:space-between; }
@@ -140,6 +143,7 @@ input:focus,select:focus { border-color:#6a87df; }
 .tag-row span,.career-tags span { background:#f0f3f8; color:#53647b; padding:5px 7px; border-radius:5px; font-size:9px; }
 .program-meta { display:grid; grid-template-columns:1fr 1fr; border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:12px 0; }
 .program-meta div { display:flex; flex-direction:column; }.program-meta small { color:var(--muted); font-size:9px; }.program-meta strong { font-size:11px; margin-top:3px; }
+.card-source { display:inline-block; margin-top:11px; color:#607497; font-size:9px; }
 .program-card-footer { display:flex; justify-content:space-between; align-items:center; padding-top:13px; }
 .program-card-footer label { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:10px; cursor:pointer; }
 .program-card-footer input { width:auto; accent-color:var(--blue); }
@@ -158,6 +162,7 @@ input:focus,select:focus { border-color:#6a87df; }
 .back-button { border:0; background:transparent; color:var(--blue); font-weight:700; padding:0 0 18px; }
 .detail-hero { background:white; border:1px solid var(--line); border-radius:16px; padding:27px; display:grid; grid-template-columns:auto 1fr auto; gap:18px; align-items:center; }
 .detail-heading span,.detail-heading p { color:var(--muted); font-size:12px; }.detail-heading h1 { margin:4px 0; font-size:27px; }
+.heading-links { display:flex; gap:13px; margin-top:9px; }
 .detail-score { border-left:1px solid var(--line); padding-left:28px; display:flex; flex-direction:column; text-align:center; }.detail-score strong { color:var(--teal); font:800 31px 'Manrope'; }.detail-score span { color:var(--muted); font-size:10px; }
 .detail-grid { display:grid; grid-template-columns:minmax(0,1.55fr) minmax(270px,.75fr); gap:18px; margin-top:18px; }.detail-grid main,.detail-grid aside { display:flex; flex-direction:column; gap:18px; }
 .detail-grid .panel h2 { font-size:19px; margin:7px 0 16px; }
@@ -168,7 +173,12 @@ input:focus,select:focus { border-color:#6a87df; }
 .cost-line { display:flex; justify-content:space-between; align-items:center; padding:11px 0; border-bottom:1px solid var(--line); }.cost-line strong { font-size:12px; }.cost-line.total { margin-bottom:14px; }.green-text { color:var(--teal); }
 .cost-card .secondary { margin-top:8px; }
 .saved-button { color:var(--teal); border-color:#a8d9d1; background:#eef9f7; }
-.requirements { padding-left:18px; color:#4e5f75; font-size:11px; line-height:1.9; }.source-note { display:block; color:#97a3b2; border-top:1px solid var(--line); padding-top:12px; }
+.requirements { padding-left:18px; color:#4e5f75; font-size:11px; line-height:1.9; }.source-note { display:block; color:#97a3b2; border-top:1px solid var(--line); padding-top:12px; line-height:1.45; }
+.official-source,.source-strip { display:flex; align-items:center; gap:10px; background:#eef8f6; border:1px solid #d2ebe6; border-radius:10px; padding:11px; margin:13px 0; }
+.source-shield { width:27px; height:27px; flex:0 0 auto; display:grid; place-items:center; border-radius:50%; color:white; background:var(--teal); font-weight:800; }
+.official-source>div,.source-strip>div { display:flex; flex:1; flex-direction:column; gap:2px; }
+.official-source strong,.source-strip strong { color:#20584f; font-size:10px; }
+.official-source small,.source-strip small { color:#69877f; font-size:8px; line-height:1.45; }
 .roadmap-head { min-height:165px; background:linear-gradient(125deg,#173652,#187567); color:white; border-radius:16px; padding:30px 35px; display:flex; align-items:center; justify-content:space-between; }
 .roadmap-head h2 { font-size:27px; margin:8px 0; }.roadmap-head p { color:#c5ddd9; margin:0; }
 .roadmap-progress { min-width:130px; padding-left:28px; border-left:1px solid rgba(255,255,255,.2); display:flex; flex-direction:column; }.roadmap-progress strong { font:800 30px 'Manrope'; }.roadmap-progress span { color:#a9d5ce; font-size:11px; }
@@ -203,6 +213,9 @@ input:focus,select:focus { border-color:#6a87df; }
 .scholarship-score { position:absolute; right:20px; top:20px; width:62px; height:62px; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:50%; background:#eaf6f3; color:var(--teal); }.scholarship-score strong { font:800 16px 'Manrope'; }.scholarship-score span { font-size:7px; }
 .funding-value { display:flex; flex-direction:column; background:#f4f7fb; border-radius:9px; padding:12px; margin:15px 0; }.funding-value small { color:var(--muted); font-size:9px; }.funding-value strong { margin-top:3px; font-size:12px; }
 .eligibility-list { display:flex; flex-direction:column; gap:7px; color:#536479; font-size:10px; }.eligibility-list span::first-letter { color:var(--teal); }
+.source-strip { background:#f5f8fc; border-color:#e1e7ef; margin-bottom:0; }
+.source-strip strong { color:#415570; }
+.source-strip small { color:#7b899a; }
 .scholarship-footer { display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--line); margin-top:17px; padding-top:13px; color:var(--muted); font-size:9px; }.scholarship-footer button { border:0; background:transparent; color:var(--blue); font-weight:800; }
 .adviser-page { max-width:1050px; }
 .chat-shell { min-height:calc(100vh - 140px); background:white; border:1px solid var(--line); border-radius:17px; display:flex; flex-direction:column; overflow:hidden; }
@@ -226,6 +239,7 @@ input:focus,select:focus { border-color:#6a87df; }
   .welcome-banner { display:block; padding:27px 23px; }.welcome-banner h2 { font-size:25px; }.readiness { margin-top:24px; }.stat-grid { grid-template-columns:1fr; }.program-grid,.wide-grid { grid-template-columns:1fr; }.section-title { align-items:center; }.recommend-section .section-title { align-items:flex-start; }.recommend-section .section-title .text-button { font-size:0; }.recommend-section .section-title .text-button::after { content:'See all →'; font-size:11px; }
   .explore-hero { padding:27px 22px; }.explore-hero h2 { font-size:25px; }.filter-bar>span { display:none; }
   .detail-hero { grid-template-columns:auto 1fr; }.detail-score { grid-column:1/-1; border-left:0; border-top:1px solid var(--line); padding:13px 0 0; flex-direction:row; justify-content:center; gap:8px; align-items:baseline; }.detail-heading h1 { font-size:21px; }.detail-grid,.roadmap-layout,.profile-grid { grid-template-columns:1fr; }.reason-list,.fact-grid { grid-template-columns:1fr 1fr; }
+  .heading-links { flex-direction:column; gap:4px; align-items:flex-start; }.official-source,.source-strip { align-items:flex-start; flex-wrap:wrap; }.official-source .external-link,.source-strip .external-link { margin-left:37px; }
   .roadmap-head { display:block; padding:26px 22px; }.roadmap-head h2 { font-size:24px; }.roadmap-progress { border-left:0; border-top:1px solid rgba(255,255,255,.2); padding:15px 0 0; margin-top:20px; flex-direction:row; gap:8px; align-items:baseline; }.roadmap-list { padding:18px 15px; }.roadmap-item { grid-template-columns:38px 1fr; }
   .profile-head { align-items:flex-start; flex-wrap:wrap; }.profile-head button { margin-left:0; width:100%; }
   .page-intro,.funding-hero { display:block; padding:25px 22px; }.page-intro h2,.funding-hero h2 { font-size:23px; }.intro-count,.funding-hero>div:last-child { border-left:0; border-top:1px solid rgba(255,255,255,.2); padding:14px 0 0; margin-top:18px; flex-direction:row; align-items:baseline; gap:7px; }

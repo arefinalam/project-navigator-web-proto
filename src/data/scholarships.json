@@ -8,7 +8,10 @@
     "deadline": "02 Jan 2027",
     "match": 92,
     "eligibility": ["Non-EU/EEA applicant", "Strong academic record", "Apply with the degree application"],
-    "note": "Your CGPA and target subject make this the strongest funding match in the current dataset."
+    "note": "Your CGPA and target subject make this the strongest funding match in the current dataset.",
+    "sourceUrl": "https://www.aalto.fi/en/study-at-aalto/scholarships-and-tuition-fees",
+    "sourceLabel": "Official Aalto scholarships and tuition page",
+    "verifiedAt": "18 June 2026"
   },
   {
     "id": "daad-master",
@@ -19,7 +22,10 @@
     "deadline": "Varies by programme",
     "match": 86,
     "eligibility": ["Relevant bachelor's degree", "Strong motivation", "Programme-specific conditions"],
-    "note": "A promising option, but the exact DAAD route must be checked against each selected programme."
+    "note": "A promising option, but the exact DAAD route must be checked against each selected programme.",
+    "sourceUrl": "https://www.daad.de/en/studying-in-germany/scholarships/",
+    "sourceLabel": "Official DAAD scholarships and funding portal",
+    "verifiedAt": "18 June 2026"
   },
   {
     "id": "tampere-early",
@@ -30,7 +36,10 @@
     "deadline": "03 Jan 2027",
     "match": 82,
     "eligibility": ["Fee-paying applicant", "Academic merit", "Submit within the admission round"],
-    "note": "Good affordability improvement for a programme already inside your target profile."
+    "note": "Good affordability improvement for a programme already inside your target profile.",
+    "sourceUrl": "https://www.tuni.fi/en/study-with-us/scholarships",
+    "sourceLabel": "Official Tampere University scholarship page",
+    "verifiedAt": "18 June 2026"
   },
   {
     "id": "nl-high-potential",
@@ -41,6 +50,9 @@
     "deadline": "Institution specific",
     "match": 68,
     "eligibility": ["Non-EEA applicant", "Competitive academic profile", "Separate scholarship application may apply"],
-    "note": "Treat this as an ambitious funding route because Dutch programme costs exceed your ideal budget."
+    "note": "Treat this as an ambitious funding route because Dutch programme costs exceed your ideal budget.",
+    "sourceUrl": "https://www.studyinnl.org/finances/nl-scholarship",
+    "sourceLabel": "Official Study in NL scholarship information",
+    "verifiedAt": "18 June 2026"
   }
 ]

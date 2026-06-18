@@ -23,6 +23,10 @@ function Logo() {
   )
 }
 
+function ExternalLink({ href, children, className = '' }: { href: string, children: React.ReactNode, className?: string }) {
+  return <a className={`external-link ${className}`} href={href} target="_blank" rel="noreferrer noopener">{children} <span aria-hidden="true">↗</span></a>
+}
+
 function AuthScreen({ onAuthenticated }: { onAuthenticated: (isNew: boolean) => void }) {
   const [mode, setMode] = useState<AuthMode>('login')
   const [name, setName] = useState('')
@@ -204,6 +208,7 @@ function ProgramCard({ program, onOpen, saved, compared, onSave, onCompare }: {
         <div><small>Annual tuition</small><strong>{program.currency} {money.format(program.tuition)}</strong></div>
         <div><small>Deadline</small><strong>{program.deadline}</strong></div>
       </div>
+      <ExternalLink href={program.programUrl} className="card-source">Official programme page</ExternalLink>
       <div className="program-card-footer">
         <label><input type="checkbox" checked={compared} onChange={onCompare} /> Compare</label>
         <button onClick={onOpen}>View match <span>→</span></button>
@@ -351,6 +356,7 @@ function Scholarships({ openProgram }: { openProgram: (program: Program) => void
               <span className="eyebrow">{item.provider}</span><h3>{item.name}</h3><p>{item.note}</p>
               <div className="funding-value"><small>Potential coverage</small><strong>{item.coverage}</strong></div>
               <div className="eligibility-list">{item.eligibility.map((rule) => <span key={rule}>✓ {rule}</span>)}</div>
+              <div className="source-strip"><div><strong>Official reference</strong><small>{item.sourceLabel} · Checked {item.verifiedAt}</small></div><ExternalLink href={item.sourceUrl}>View source</ExternalLink></div>
               <div className="scholarship-footer"><span>Deadline: {item.deadline}</span>{related && <button onClick={() => openProgram(related)}>Related program →</button>}</div>
             </article>
           })}
@@ -433,7 +439,7 @@ function ProgramDetail({ program, goBack, goRoadmap, saved, toggleSaved }: { pro
         <button className="back-button" onClick={goBack}>← Back to programs</button>
         <section className="detail-hero">
           <div className="uni-logo large" style={{ background: program.accent }}>{program.university.split(' ').map((word) => word[0]).slice(0, 2).join('')}</div>
-          <div className="detail-heading"><span>{program.flag} {program.city}, {program.country}</span><h1>{program.program}</h1><p>{program.university} · {program.ranking}</p></div>
+          <div className="detail-heading"><span>{program.flag} {program.city}, {program.country}</span><h1>{program.program}</h1><p>{program.university} · {program.ranking}</p><div className="heading-links"><ExternalLink href={program.programUrl}>Official programme</ExternalLink><ExternalLink href={program.universityUrl}>University website</ExternalLink></div></div>
           <div className="detail-score"><strong>{program.match}%</strong><span>Excellent match</span></div>
         </section>
         <div className="detail-grid">
@@ -444,7 +450,7 @@ function ProgramDetail({ program, goBack, goRoadmap, saved, toggleSaved }: { pro
           </main>
           <aside>
             <section className="panel cost-card"><span className="eyebrow">Estimated cost</span><div className="cost-line"><small>Annual tuition</small><strong>{program.currency} {money.format(program.tuition)}</strong></div><div className="cost-line"><small>Scholarship</small><strong className="green-text">{program.scholarship}</strong></div><div className="cost-line total"><small>Estimated first year</small><strong>BDT 18–24 lakh</strong></div><button className="primary wide" onClick={goRoadmap}>Add to my roadmap →</button><button className={`secondary wide ${saved ? 'saved-button' : ''}`} onClick={toggleSaved}>{saved ? '✓ Saved to shortlist' : 'Save to shortlist'}</button></section>
-            <section className="panel"><span className="eyebrow">Entry requirements</span><ul className="requirements">{program.requirements.map((item) => <li key={item}>{item}</li>)}</ul><small className="source-note">Mock data · Last reviewed 18 Jun 2026</small></section>
+            <section className="panel"><span className="eyebrow">Entry requirements</span><ul className="requirements">{program.requirements.map((item) => <li key={item}>{item}</li>)}</ul><div className="official-source"><span className="source-shield">✓</span><div><strong>Official reference available</strong><small>{program.sourceLabel}<br />Checked {program.verifiedAt}</small></div><ExternalLink href={program.programUrl}>Open source</ExternalLink></div><small className="source-note">Prototype values may be simplified. Always confirm fees, requirements and deadlines on the official page.</small></section>
           </aside>
         </div>
       </div>

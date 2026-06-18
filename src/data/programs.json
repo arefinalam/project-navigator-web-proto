@@ -19,7 +19,11 @@
     "requirements": ["Relevant bachelor's degree", "Strong mathematics and programming", "IELTS 6.5 or equivalent", "Statement of purpose"],
     "matchReasons": ["Your computer science degree meets the core academic background.", "The estimated cost stays within your preferred budget range.", "Your software and analytics projects align with the curriculum.", "Germany matches your preferred destination list."],
     "careerPaths": ["Data Engineer", "Machine Learning Engineer", "Analytics Consultant", "Research Engineer"],
-    "accent": "#153f7a"
+    "accent": "#153f7a",
+    "programUrl": "https://www.tum.de/en/studies/degree-programs/detail/data-engineering-and-analytics-master-of-science-msc",
+    "universityUrl": "https://www.tum.de/en/",
+    "sourceLabel": "Official TUM programme page",
+    "verifiedAt": "18 June 2026"
   },
   {
     "id": "aalto-ml",
@@ -41,7 +45,11 @@
     "requirements": ["Relevant bachelor's degree", "Excellent academic performance", "IELTS 6.5 or equivalent", "Motivation letter and references"],
     "matchReasons": ["Your CGPA is competitive for the program profile.", "The scholarship pathway improves affordability.", "The AI specialization closely matches your stated career goal.", "Your preferred intake aligns with the annual application cycle."],
     "careerPaths": ["AI Engineer", "Data Scientist", "Product Analyst", "Doctoral Researcher"],
-    "accent": "#2266a8"
+    "accent": "#2266a8",
+    "programUrl": "https://www.aalto.fi/en/study-options/machine-learning-data-science-and-artificial-intelligence-computer-communication-and-information-sciences-master-of-science-technology",
+    "universityUrl": "https://www.aalto.fi/en",
+    "sourceLabel": "Official Aalto study option",
+    "verifiedAt": "18 June 2026"
   },
   {
     "id": "tue-ds",
@@ -63,7 +71,11 @@
     "requirements": ["Computer science or related degree", "Calculus and statistics", "IELTS 6.5", "Certified academic documents"],
     "matchReasons": ["Your degree covers most prerequisite areas.", "Eindhoven offers strong technology-industry access.", "The program supports your data science career direction.", "A scholarship would be needed to stay within your ideal budget."],
     "careerPaths": ["Data Scientist", "AI Consultant", "Decision Scientist", "Software Engineer"],
-    "accent": "#d34826"
+    "accent": "#d34826",
+    "programUrl": "https://www.tue.nl/en/education/graduate-school/master-data-science-and-artificial-intelligence",
+    "universityUrl": "https://www.tue.nl/en/",
+    "sourceLabel": "Official TU/e programme page",
+    "verifiedAt": "18 June 2026"
   },
   {
     "id": "saarland-ds",
@@ -85,7 +97,11 @@
     "requirements": ["Strong CS bachelor's degree", "Advanced algorithms and mathematics", "English proficiency", "Competitive academic profile"],
     "matchReasons": ["No tuition fee makes this a strong financial fit.", "Your CS background aligns with the program.", "Research exposure would strengthen your profile.", "Admission competitiveness should be treated as ambitious."],
     "careerPaths": ["Research Scientist", "ML Engineer", "Data Scientist", "PhD Candidate"],
-    "accent": "#652f8f"
+    "accent": "#652f8f",
+    "programUrl": "https://saarland-informatics-campus.de/en/studium-studies/master-english/data-science-and-artificial-intelligence/",
+    "universityUrl": "https://www.uni-saarland.de/en/home.html",
+    "sourceLabel": "Official Saarland Informatics Campus page",
+    "verifiedAt": "18 June 2026"
   },
   {
     "id": "tampere-ds",
@@ -107,6 +123,10 @@
     "requirements": ["Relevant bachelor's degree", "Programming coursework", "IELTS 6.5", "Academic transcript"],
     "matchReasons": ["Good academic alignment with your existing coursework.", "Scholarship availability improves the budget fit.", "Applied project work supports employability.", "The deadline requires early English-test preparation."],
     "careerPaths": ["Data Analyst", "Data Scientist", "BI Developer", "Analytics Engineer"],
-    "accent": "#c3416c"
+    "accent": "#c3416c",
+    "programUrl": "https://www.tuni.fi/en/tau/masters-programmes/data-science-computing-sciences-and-electrical-engineering",
+    "universityUrl": "https://www.tuni.fi/en",
+    "sourceLabel": "Official Tampere University programme page",
+    "verifiedAt": "18 June 2026"
   }
 ]

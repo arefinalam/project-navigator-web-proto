@@ -29,6 +29,10 @@ export type Program = {
   matchReasons: string[]
   careerPaths: string[]
   accent: string
+  programUrl: string
+  universityUrl: string
+  sourceLabel: string
+  verifiedAt: string
 }
 
 export type RoadmapItem = {
@@ -50,6 +54,9 @@ export type Scholarship = {
   match: number
   eligibility: string[]
   note: string
+  sourceUrl: string
+  sourceLabel: string
+  verifiedAt: string
 }
 
 export type ChatMessage = {
