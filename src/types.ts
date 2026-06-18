@@ -65,3 +65,52 @@ export type ChatMessage = {
   text: string
   sources?: string[]
 }
+
+export type UserProfile = {
+  fullName: string
+  city: string
+  country: string
+  goal: string
+  currentDegree: string
+  institution: string
+  cgpa: number
+  graduationYear: number
+  targetDegree: string
+  subject: string
+  preferredIntake: string
+  preferredCountries: string[]
+  annualBudgetBdt: number
+  ieltsStatus: 'not-planned' | 'planning' | 'completed'
+  ieltsScore: number
+  sponsorReady: boolean
+  transcriptReady: boolean
+}
+
+export type ProgramScore = {
+  overall: number
+  academic: number
+  budget: number
+  destination: number
+  english: number
+  funding: number
+  reasons: string[]
+}
+
+export type CostEstimate = {
+  tuitionBdt: number
+  livingBdt: number
+  applicationBdt: number
+  visaTravelBdt: number
+  scholarshipBdt: number
+  firstYearBdt: number
+  fullProgramBdt: number
+  budgetGapBdt: number
+}
+
+export type AppNotification = {
+  id: string
+  title: string
+  detail: string
+  type: 'deadline' | 'profile' | 'funding' | 'recommendation'
+  action: View
+}
