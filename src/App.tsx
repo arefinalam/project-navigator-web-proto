@@ -4,12 +4,12 @@ import roadmapData from './data/roadmap.json'
 import scholarshipsData from './data/scholarships.json'
 import { usePersistentState } from './hooks/usePersistentState'
 import { Autocomplete, MultiAutocomplete } from './components/Autocomplete'
-import { countries, currencies, subjects, universities } from './data/referenceData'
+import { countries, countryPreferenceDefaults, currencies, subjects, timezones, universities } from './data/referenceData'
 import { defaultDocuments } from './data/documents'
 import { studyPhases } from './data/studyPlan'
 import { experts } from './data/experts'
 import { canUseFeature, minimumPlanName, plans, type GatedFeature } from './data/plans'
-import { bdtToPreferred, buildNotifications, defaultProfile, estimateCost, formatPreferredCurrency, preferredToBdt, scoreProgram } from './lib/personalization'
+import { bdtToPreferred, buildNotifications, defaultProfile, estimateCost, formatPreferredCurrency, formatProfileCurrency, formatProfileDate, preferredToBdt, scoreProgram } from './lib/personalization'
 import type { ApplicationRecord, ApplicationStatus, AppNotification, ChatMessage, ConsultationBooking, DocumentFile, Expert, Program, ProgramScore, RoadmapItem, Scholarship, StudyPhaseId, SubscriptionPlan, SubscriptionState, UserDocument, UserProfile, View } from './types'
 import './App.css'
 
@@ -47,12 +47,29 @@ function ExternalLink({ href, children, className = '' }: { href: string, childr
   return <a className={`external-link ${className}`} href={href} target="_blank" rel="noreferrer noopener">{children} <span aria-hidden="true">↗</span></a>
 }
 
+function PublicLanding({ onStart, onDemo }: { onStart: () => void, onDemo: () => void }) {
+  return <main className="landing-page">
+    <header className="landing-nav"><Logo /><nav aria-label="Public navigation"><a href="#how-it-works">How it works</a><a href="#features">Features</a><a href="#plans">Plans</a></nav><div><button className="text-button" onClick={onStart}>Log in</button><button className="primary small" onClick={onStart}>Build my plan</button></div></header>
+    <section className="landing-hero">
+      <div><span className="eyebrow">Study decisions, made navigable</span><h1>A personal route from “maybe” to <em>ready.</em></h1><p>Compare realistic study options, understand costs, organize applications, and bring in expert help—without losing the thread of your plan.</p><div className="landing-actions"><button className="primary" onClick={onStart}>Create my guidance profile →</button><button className="secondary" onClick={onDemo}>Explore the demo</button></div><small>No payment required · Prototype data stays in this browser</small></div>
+      <div className="landing-preview" aria-label="Product preview"><div className="preview-head"><span>Samira’s study plan</span><strong>74% ready</strong></div><div className="preview-route"><span className="done">✓</span><div><strong>Profile and goals</strong><small>Complete</small></div></div><div className="preview-route"><span className="active">2</span><div><strong>Research and shortlist</strong><small>3 strong programme matches</small></div></div><div className="preview-route"><span>3</span><div><strong>Tests and documents</strong><small>IELTS is the next priority</small></div></div><div className="preview-match"><small>Strongest current match</small><strong>Technical University of Munich</strong><span>88% profile fit · budget needs funding</span></div></div>
+    </section>
+    <section className="landing-proof"><span>One connected workspace for</span><div><strong>Programme discovery</strong><strong>Funding strategy</strong><strong>Application tracking</strong><strong>Expert review</strong></div></section>
+    <section className="landing-section" id="how-it-works"><span className="eyebrow">How it works</span><h2>Guidance that changes when your reality changes.</h2><div className="landing-steps">{[['01','Map your profile','Add your academic background, budget, destinations and target intake.'],['02','See the trade-offs','Compare fit, funding pressure, readiness gaps and practical next steps.'],['03','Follow one plan','Track documents, applications, expert reviews, visa and departure work.']].map(([number,title,text]) => <article key={number}><span>{number}</span><h3>{title}</h3><p>{text}</p></article>)}</div></section>
+    <section className="landing-section landing-features" id="features"><div><span className="eyebrow light">Built for consequential choices</span><h2>More than a list of universities.</h2><p>Navigator connects recommendations to the work required to make them possible.</p></div><div className="feature-list"><article><span>✦</span><strong>Profile-aware matching</strong><p>Recommendations recalculate around academics, budget, destinations and readiness.</p></article><article><span>◇</span><strong>Application workspace</strong><p>Move from shortlist to documents, funding, submission, visa and departure.</p></article><article><span>◎</span><strong>Human review when needed</strong><p>Prepare a structured case and selectively share it with an expert.</p></article></div></section>
+    <section className="landing-cta" id="plans"><span className="eyebrow">Start with the free discovery plan</span><h2>Your next decision should feel smaller than your whole future.</h2><button className="primary" onClick={onStart}>Start building my plan →</button></section>
+    <footer className="landing-footer"><Logo /><span>Global study guidance prototype · 2026</span></footer>
+  </main>
+}
+
 function AuthScreen({ onAuthenticated }: { onAuthenticated: (isNew: boolean) => void }) {
+  const [showAuth, setShowAuth] = useState(false)
   const [mode, setMode] = useState<AuthMode>('login')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault()
@@ -60,9 +77,19 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (isNew: boolean) => 
       setError('Please complete all required fields.')
       return
     }
-    localStorage.setItem('navigator-session', JSON.stringify({ name: name || 'Samira Rahman', email }))
-    onAuthenticated(mode === 'signup')
+    setLoading(true)
+    window.setTimeout(() => {
+      localStorage.setItem('navigator-session', JSON.stringify({ name: name || 'Samira Rahman', email }))
+      onAuthenticated(mode === 'signup')
+    }, 450)
   }
+
+  const useDemo = () => {
+    localStorage.setItem('navigator-session', JSON.stringify({ name: 'Samira Rahman', email: 'demo@navigator.app' }))
+    onAuthenticated(false)
+  }
+
+  if (!showAuth) return <PublicLanding onStart={() => setShowAuth(true)} onDemo={useDemo} />
 
   return (
     <main className="auth-page">
@@ -84,6 +111,7 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (isNew: boolean) => 
 
       <section className="auth-panel">
         <div className="auth-card">
+          <button className="auth-back" onClick={() => setShowAuth(false)}>← Back to overview</button>
           <span className="mobile-brand"><Logo /></span>
           <span className="eyebrow">{mode === 'login' ? 'Welcome back' : 'Start your journey'}</span>
           <h2>{mode === 'login' ? 'Continue your roadmap' : 'Create your free profile'}</h2>
@@ -101,13 +129,10 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (isNew: boolean) => 
             <label>Email address<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" /></label>
             <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" /></label>
             {error && <p className="form-error">{error}</p>}
-            <button className="primary wide" type="submit">{mode === 'login' ? 'Log in' : 'Create my profile'} <span>→</span></button>
+            <button className="primary wide" type="submit" disabled={loading}>{loading ? 'Preparing your workspace…' : mode === 'login' ? 'Log in' : 'Create my profile'} <span>{loading ? '◌' : '→'}</span></button>
           </form>
 
-          <button className="demo-login" onClick={() => {
-            localStorage.setItem('navigator-session', JSON.stringify({ name: 'Samira Rahman', email: 'demo@navigator.app' }))
-            onAuthenticated(false)
-          }}>Use demo account</button>
+          <button className="demo-login" onClick={useDemo}>Use demo account</button>
           <p className="legal">Prototype only — your information stays in this browser.</p>
         </div>
       </section>
@@ -159,6 +184,8 @@ function Onboarding({ profile, onComplete }: { profile: UserProfile, onComplete:
               <label>Annual budget ({draft.preferredCurrency})<input type="number" step="1000" value={bdtToPreferred(draft.annualBudgetBdt, draft.preferredCurrency)} onChange={(e) => setDraft({ ...draft, annualBudgetBdt: preferredToBdt(Number(e.target.value), draft.preferredCurrency) })} /></label>
               <MultiAutocomplete label="Preferred destinations" values={draft.preferredCountries} options={countries} onChange={(preferredCountries) => setDraft({ ...draft, preferredCountries })} />
               <label>English test<select value={draft.ieltsStatus} onChange={(e) => setDraft({ ...draft, ieltsStatus: e.target.value as UserProfile['ieltsStatus'] })}><option value="planning">Planning IELTS</option><option value="completed">IELTS completed</option><option value="not-planned">Not planned</option></select></label>
+              <label>Interface language<select value={draft.interfaceLanguage} onChange={(e) => setDraft({ ...draft, interfaceLanguage: e.target.value as UserProfile['interfaceLanguage'] })}><option value="en">English</option><option value="bn">বাংলা (Bangla preview)</option></select></label>
+              <label>Timezone<select value={draft.timezone} onChange={(e) => setDraft({ ...draft, timezone: e.target.value })}>{timezones.map((timezone) => <option key={timezone}>{timezone}</option>)}</select></label>
             </div>
           </>}
           <div className="onboarding-actions">
@@ -208,7 +235,7 @@ function Sidebar({ view, setView, onLogout, documentCount, planId, onLocked }: {
 
 function Topbar({ title, notifications = [], onNotification }: { title: string, notifications?: AppNotification[], onNotification?: (item: AppNotification) => void }) {
   const [open, setOpen] = useState(false)
-  return <header className="topbar"><div><span className="mobile-logo"><Logo /></span><h1>{title}</h1></div><div className="top-actions"><button aria-label="Notifications" onClick={() => setOpen((value) => !value)}>♢{notifications.length > 0 && <span className="notification-dot" />}</button><div className="avatar">SR</div>{open && <div className="notification-menu"><div className="notification-title"><strong>Notifications</strong><span>{notifications.length} new</span></div>{notifications.map((item) => <button className="notification-item" key={item.id} onClick={() => { onNotification?.(item); setOpen(false) }}><span className={`notice-icon ${item.type}`}>{item.type === 'funding' ? '$' : item.type === 'deadline' ? '!' : item.type === 'profile' ? '○' : '✦'}</span><div><strong>{item.title}</strong><small>{item.detail}</small></div></button>)}</div>}</div></header>
+  return <header className="topbar"><div><span className="mobile-logo"><Logo /></span><h1>{title}</h1></div><div className="top-actions"><button aria-label="Notifications" aria-expanded={open} onClick={() => setOpen((value) => !value)}>♢{notifications.length > 0 && <span className="notification-dot" />}</button><div className="avatar" aria-label="Samira Rahman">SR</div>{open && <div className="notification-menu"><div className="notification-title"><strong>Notifications</strong><span>{notifications.length} new</span></div>{notifications.length ? notifications.map((item) => <button className="notification-item" key={item.id} onClick={() => { onNotification?.(item); setOpen(false) }}><span className={`notice-icon ${item.type}`}>{item.type === 'funding' ? '$' : item.type === 'deadline' ? '!' : item.type === 'profile' ? '○' : '✦'}</span><div><strong>{item.title}</strong><small>{item.detail}</small></div></button>) : <div className="notification-empty"><span>✓</span><strong>You’re caught up</strong><small>New guidance alerts will appear here.</small></div>}</div>}</div></header>
 }
 
 function ProgramCard({ program, score, profile, onOpen, saved, compared, onSave, onCompare, saveDisabled = false, compareDisabled = false }: {
@@ -237,7 +264,7 @@ function ProgramCard({ program, score, profile, onOpen, saved, compared, onSave,
       <p>{program.university}</p>
       <div className="tag-row"><span>{program.degree}</span><span>{program.duration}</span><span>{program.intake}</span></div>
       <div className="program-meta">
-        <div><small>Annual tuition</small><strong>{formatPreferredCurrency(estimateCost(program, profile).tuitionBdt, profile.preferredCurrency)}</strong></div>
+        <div><small>Annual tuition</small><strong>{formatProfileCurrency(estimateCost(program, profile).tuitionBdt, profile)}</strong></div>
         <div><small>Deadline</small><strong>{program.deadline}</strong></div>
       </div>
       <div className="score-mini"><span>Academic {score.academic}%</span><span>Budget {score.budget}%</span></div>
@@ -369,7 +396,7 @@ function Shortlist({ savedIds, compareIds, openProgram, toggleSaved, toggleCompa
                   <tr><td>Match</td>{comparedPrograms.map((program) => <td key={program.id}><span className="score-chip">{scores[program.id].overall}%</span></td>)}</tr>
                   <tr><td>Academic</td>{comparedPrograms.map((program) => <td key={program.id}>{scores[program.id].academic}%</td>)}</tr>
                   <tr><td>Budget fit</td>{comparedPrograms.map((program) => <td key={program.id}>{scores[program.id].budget}%</td>)}</tr>
-                  <tr><td>Tuition</td>{comparedPrograms.map((program) => <td key={program.id}>{formatPreferredCurrency(estimateCost(program, profile).tuitionBdt, profile.preferredCurrency)}</td>)}</tr>
+                  <tr><td>Tuition</td>{comparedPrograms.map((program) => <td key={program.id}>{formatProfileCurrency(estimateCost(program, profile).tuitionBdt, profile)}</td>)}</tr>
                   <tr><td>Funding</td>{comparedPrograms.map((program) => <td key={program.id}>{program.scholarship}</td>)}</tr>
                   <tr><td>Deadline</td>{comparedPrograms.map((program) => <td key={program.id}>{program.deadline}</td>)}</tr>
                   <tr><td>Action</td>{comparedPrograms.map((program) => <td key={program.id}><button className="text-button" onClick={() => openProgram(program)}>Open match →</button><button className="remove-link" onClick={() => toggleCompare(program.id)}>Remove</button></td>)}</tr>
@@ -519,7 +546,7 @@ function ProgramDetail({ program, score, profile, goBack, goRoadmap, saved, togg
             <section className="panel"><span className="eyebrow">Career direction</span><h2>Where this can take you</h2><div className="career-tags">{program.careerPaths.map((item) => <span key={item}>{item}</span>)}</div></section>
           </main>
           <aside>
-            <section className="panel cost-card"><span className="eyebrow">Cost estimate · {profile.preferredCurrency}</span><div className="cost-line"><small>Tuition</small><strong>{formatPreferredCurrency(cost.tuitionBdt, profile.preferredCurrency)}</strong></div><div className="cost-line"><small>Living estimate</small><strong>{formatPreferredCurrency(cost.livingBdt, profile.preferredCurrency)}</strong></div><div className="cost-line"><small>Visa, travel & applications</small><strong>{formatPreferredCurrency(cost.visaTravelBdt + cost.applicationBdt, profile.preferredCurrency)}</strong></div>{advancedCosts ? <><label className="scholarship-input">Expected tuition scholarship <strong>{scholarshipPercent}%</strong><input type="range" min="0" max="100" step="10" value={scholarshipPercent} onChange={(event) => setScholarshipPercent(Number(event.target.value))} /></label><div className="cost-line green-text"><small>Scholarship deduction</small><strong>- {formatPreferredCurrency(cost.scholarshipBdt, profile.preferredCurrency)}</strong></div></> : <LockedFeature feature="advancedCosts" compact onUpgrade={onUpgrade} />}<div className="cost-line total"><small>Estimated first year</small><strong>{formatPreferredCurrency(cost.firstYearBdt, profile.preferredCurrency)}</strong></div><div className={`budget-result ${cost.budgetGapBdt <= 0 ? 'within' : 'gap'}`}><strong>{cost.budgetGapBdt <= 0 ? 'Within your budget' : `${formatPreferredCurrency(cost.budgetGapBdt, profile.preferredCurrency)} above budget`}</strong><small>Your stated annual budget: {formatPreferredCurrency(profile.annualBudgetBdt, profile.preferredCurrency)}</small></div><small className="rate-note">Prototype conversion uses fixed mock exchange rates, not live market rates.</small><button className="primary wide" onClick={goRoadmap}>Add to my roadmap →</button><button className={`secondary wide ${saved ? 'saved-button' : ''}`} onClick={toggleSaved}>{saved ? '✓ Saved to shortlist' : 'Save to shortlist'}</button></section>
+            <section className="panel cost-card"><span className="eyebrow">Cost estimate · {profile.preferredCurrency}</span><div className="cost-line"><small>Tuition</small><strong>{formatProfileCurrency(cost.tuitionBdt, profile)}</strong></div><div className="cost-line"><small>Living estimate</small><strong>{formatProfileCurrency(cost.livingBdt, profile)}</strong></div><div className="cost-line"><small>Visa, travel & applications</small><strong>{formatProfileCurrency(cost.visaTravelBdt + cost.applicationBdt, profile)}</strong></div>{advancedCosts ? <><label className="scholarship-input">Expected tuition scholarship <strong>{scholarshipPercent}%</strong><input type="range" min="0" max="100" step="10" value={scholarshipPercent} onChange={(event) => setScholarshipPercent(Number(event.target.value))} /></label><div className="cost-line green-text"><small>Scholarship deduction</small><strong>- {formatProfileCurrency(cost.scholarshipBdt, profile)}</strong></div></> : <LockedFeature feature="advancedCosts" compact onUpgrade={onUpgrade} />}<div className="cost-line total"><small>Estimated first year</small><strong>{formatProfileCurrency(cost.firstYearBdt, profile)}</strong></div><div className={`budget-result ${cost.budgetGapBdt <= 0 ? 'within' : 'gap'}`}><strong>{cost.budgetGapBdt <= 0 ? 'Within your budget' : `${formatProfileCurrency(cost.budgetGapBdt, profile)} above budget`}</strong><small>Your stated annual budget: {formatProfileCurrency(profile.annualBudgetBdt, profile)}</small></div><small className="rate-note">Prototype conversion uses fixed mock exchange rates, not live market rates.</small><button className="primary wide" onClick={goRoadmap}>Add to my roadmap →</button><button className={`secondary wide ${saved ? 'saved-button' : ''}`} onClick={toggleSaved}>{saved ? '✓ Saved to shortlist' : 'Save to shortlist'}</button></section>
             <section className="panel"><span className="eyebrow">Entry requirements</span><ul className="requirements">{program.requirements.map((item) => <li key={item}>{item}</li>)}</ul><div className="official-source"><span className="source-shield">✓</span><div><strong>Official reference available</strong><small>{program.sourceLabel}<br />Checked {program.verifiedAt}</small></div><ExternalLink href={program.programUrl}>Open source</ExternalLink></div><small className="source-note">Prototype values may be simplified. Always confirm fees, requirements and deadlines on the official page.</small></section>
           </aside>
         </div>
@@ -631,7 +658,7 @@ function StudyPlan({ profile, documents, savedIds, scores, applications, setAppl
               <div className="section-title"><div><span className="eyebrow">Your shortlist</span><h2>Choose what moves into application preparation</h2></div><button className="text-button" onClick={() => setView('shortlist')}>Manage shortlist →</button></div>
               <div className="application-candidates">{savedPrograms.map((program) => {
                 const alreadyAdded = applications.some((item) => item.programId === program.id)
-                return <div key={program.id}><div><strong>{program.university}</strong><small>{scores[program.id].overall}% match · {formatPreferredCurrency(estimateCost(program, profile).firstYearBdt, profile.preferredCurrency)} first year</small></div><button disabled={alreadyAdded} onClick={() => addApplication(program)}>{alreadyAdded ? 'Added' : 'Start application'}</button></div>
+                return <div key={program.id}><div><strong>{program.university}</strong><small>{scores[program.id].overall}% match · {formatProfileCurrency(estimateCost(program, profile).firstYearBdt, profile)} first year</small></div><button disabled={alreadyAdded} onClick={() => addApplication(program)}>{alreadyAdded ? 'Added' : 'Start application'}</button></div>
               })}</div>
             </section>
           </main>
@@ -703,7 +730,7 @@ function Experts({ profile, documents, bookings, setBookings, plan, subscription
             const expert = experts.find((item) => item.id === booking.expertId)
             const service = expert?.services.find((item) => item.id === booking.serviceId)
             if (!expert || !service) return null
-            return <article className="booking-row" key={booking.id}><div className="expert-avatar small" style={{ background: expert.accent }}>{expert.initials}</div><div><strong>{service.title}</strong><span>{expert.name}</span><small>{booking.date} · {booking.time} · {booking.timezone}</small></div><div className="shared-count">▤ {booking.documentIds.length} shared</div><button onClick={() => { updateBooking(booking.id, { status: 'cancelled' }); setToast('Consultation cancelled in the prototype.') }}>Cancel</button></article>
+            return <article className="booking-row" key={booking.id}><div className="expert-avatar small" style={{ background: expert.accent }}>{expert.initials}</div><div><strong>{service.title}</strong><span>{expert.name}</span><small>{formatProfileDate(booking.date, profile)} · {booking.time} · {booking.timezone}</small></div><div className="shared-count">▤ {booking.documentIds.length} shared</div><button onClick={() => { updateBooking(booking.id, { status: 'cancelled' }); setToast('Consultation cancelled in the prototype.') }}>Cancel</button></article>
           })}</div>
         </section>}
 
@@ -718,13 +745,13 @@ function Experts({ profile, documents, bookings, setBookings, plan, subscription
             <span className="eyebrow">{expert.specializations[0]}</span><h3>{expert.name}</h3><p className="expert-title">{expert.title}</p><p className="expert-bio">{expert.bio}</p>
             <div className="expert-tags">{expert.countries.slice(0, 4).map((item) => <span key={item}>{item}</span>)}</div>
             <div className="expert-facts"><div><small>Experience</small><strong>{expert.experienceYears} years</strong></div><div><small>Languages</small><strong>{expert.languages.join(', ')}</strong></div></div>
-            <div className="expert-card-footer"><div><small>From</small><strong>{formatUsd(startingPrice, profile.preferredCurrency)}</strong></div><button className="secondary" onClick={() => setSelectedExpert(expert)}>View profile</button><button className="primary" onClick={() => setBookingExpert(expert)}>Book</button></div>
+            <div className="expert-card-footer"><div><small>From</small><strong>{formatUsd(startingPrice, profile)}</strong></div><button className="secondary" onClick={() => setSelectedExpert(expert)}>View profile</button><button className="primary" onClick={() => setBookingExpert(expert)}>Book</button></div>
           </article>
         })}</div>
 
         {previous.length > 0 && <section className="consultation-history panel"><span className="eyebrow">History</span><h2>Previous and cancelled consultations</h2>{previous.map((booking) => {
           const expert = experts.find((item) => item.id === booking.expertId)
-          return <div key={booking.id}><strong>{expert?.name}</strong><span>{booking.date} · {booking.status}</span></div>
+          return <div key={booking.id}><strong>{expert?.name}</strong><span>{formatProfileDate(booking.date, profile)} · {booking.status}</span></div>
         })}</section>}
       </div>
       {selectedExpert && <ExpertProfileModal expert={selectedExpert} profile={profile} onClose={() => setSelectedExpert(null)} onBook={() => { setBookingExpert(selectedExpert); setSelectedExpert(null) }} />}
@@ -734,13 +761,13 @@ function Experts({ profile, documents, bookings, setBookings, plan, subscription
 }
 
 function ExpertProfileModal({ expert, profile, onClose, onBook }: { expert: Expert, profile: UserProfile, onClose: () => void, onBook: () => void }) {
-  return <div className="modal-backdrop" onMouseDown={onClose}><section className="expert-profile-modal" onMouseDown={(event) => event.stopPropagation()}>
-    <button className="modal-close" onClick={onClose}>×</button>
-    <div className="expert-profile-head"><div className="expert-avatar large" style={{ background: expert.accent }}>{expert.initials}</div><div><span className="eyebrow">{expert.specializations.join(' · ')}</span><h2>{expert.name}</h2><p>{expert.title}</p><div className="profile-rating">★ {expert.rating} from {expert.reviews} reviews · {expert.experienceYears} years experience</div></div></div>
+  return <div className="modal-backdrop" onMouseDown={onClose}><section className="expert-profile-modal" role="dialog" aria-modal="true" aria-labelledby="expert-profile-title" onMouseDown={(event) => event.stopPropagation()}>
+    <button className="modal-close" aria-label="Close expert profile" onClick={onClose}>×</button>
+    <div className="expert-profile-head"><div className="expert-avatar large" style={{ background: expert.accent }}>{expert.initials}</div><div><span className="eyebrow">{expert.specializations.join(' · ')}</span><h2 id="expert-profile-title">{expert.name}</h2><p>{expert.title}</p><div className="profile-rating">★ {expert.rating} from {expert.reviews} reviews · {expert.experienceYears} years experience</div></div></div>
     <p className="modal-bio">{expert.bio}</p>
     <div className="expert-profile-grid"><div><span className="eyebrow">Destination coverage</span><div className="expert-tags">{expert.countries.map((item) => <span key={item}>{item}</span>)}</div></div><div><span className="eyebrow">Education & background</span>{expert.education.map((item) => <p className="credential-line" key={item}>✓ {item}</p>)}</div></div>
     <ExternalLink href={expert.credentialsUrl}>View public credential reference</ExternalLink>
-    <div className="service-preview"><span className="eyebrow">Available services</span>{expert.services.map((service) => <div key={service.id}><div><strong>{service.title}</strong><small>{service.durationMinutes} minutes · {service.description}</small></div><strong>{formatUsd(service.priceUsd, profile.preferredCurrency)}</strong></div>)}</div>
+    <div className="service-preview"><span className="eyebrow">Available services</span>{expert.services.map((service) => <div key={service.id}><div><strong>{service.title}</strong><small>{service.durationMinutes} minutes · {service.description}</small></div><strong>{formatUsd(service.priceUsd, profile)}</strong></div>)}</div>
     <button className="primary wide" onClick={onBook}>Choose a service and book →</button>
   </section></div>
 }
@@ -766,7 +793,7 @@ function BookingModal({ expert, profile, documents, availableExpertCredits, prio
       serviceId,
       date,
       time,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timezone: profile.timezone,
       documentIds: selectedDocuments,
       caseSummary: summary,
       consent,
@@ -775,19 +802,19 @@ function BookingModal({ expert, profile, documents, availableExpertCredits, prio
     })
   }
 
-  return <div className="modal-backdrop"><section className="booking-modal">
-    <button className="modal-close" onClick={onClose}>×</button>
-    <div className="booking-heading"><span className="eyebrow">Book consultation · Step {step} of 4</span><h2>{expert.name}</h2><div className="booking-stepper">{[1, 2, 3, 4].map((item) => <span className={item <= step ? 'active' : ''} key={item} />)}</div></div>
-    {step === 1 && <div className="booking-content"><h3>Choose a service</h3><div className="service-choice">{expert.services.map((item) => <button className={serviceId === item.id ? 'selected' : ''} onClick={() => setServiceId(item.id)} key={item.id}><div><strong>{item.title}</strong><small>{item.durationMinutes} minutes · {item.description}</small></div><strong>{formatUsd(item.priceUsd, profile.preferredCurrency)}</strong></button>)}</div></div>}
-    {step === 2 && <div className="booking-content"><h3>Select a date and time</h3>{priorityAccess && <div className="priority-access">◆ Priority booking access enabled by your plan</div>}<div className="date-choice">{dates.map((item) => <button className={date === item ? 'selected' : ''} onClick={() => { setDate(item); setTime(expert.availability[item][0]) }} key={item}>{item}</button>)}</div><div className="time-choice">{expert.availability[date].map((item) => <button className={time === item ? 'selected' : ''} onClick={() => setTime(item)} key={item}>{item}</button>)}</div><small className="timezone-note">Times will be treated as {Intl.DateTimeFormat().resolvedOptions().timeZone} for this prototype.</small></div>}
+  return <div className="modal-backdrop"><section className="booking-modal" role="dialog" aria-modal="true" aria-labelledby="booking-title">
+    <button className="modal-close" aria-label="Close booking" onClick={onClose}>×</button>
+    <div className="booking-heading"><span className="eyebrow">Book consultation · Step {step} of 4</span><h2 id="booking-title">{expert.name}</h2><div className="booking-stepper">{[1, 2, 3, 4].map((item) => <span className={item <= step ? 'active' : ''} key={item} />)}</div></div>
+    {step === 1 && <div className="booking-content"><h3>Choose a service</h3><div className="service-choice">{expert.services.map((item) => <button className={serviceId === item.id ? 'selected' : ''} onClick={() => setServiceId(item.id)} key={item.id}><div><strong>{item.title}</strong><small>{item.durationMinutes} minutes · {item.description}</small></div><strong>{formatUsd(item.priceUsd, profile)}</strong></button>)}</div></div>}
+    {step === 2 && <div className="booking-content"><h3>Select a date and time</h3>{priorityAccess && <div className="priority-access">◆ Priority booking access enabled by your plan</div>}<div className="date-choice">{dates.map((item) => <button className={date === item ? 'selected' : ''} onClick={() => { setDate(item); setTime(expert.availability[item][0]) }} key={item}>{formatProfileDate(item, profile)}</button>)}</div><div className="time-choice">{expert.availability[date].map((item) => <button className={time === item ? 'selected' : ''} onClick={() => setTime(item)} key={item}>{item}</button>)}</div><small className="timezone-note">Times are shown in your saved timezone: {profile.timezone}.</small></div>}
     {step === 3 && <div className="booking-content"><h3>Prepare the expert case</h3><label className="case-summary">Case summary<textarea value={summary} onChange={(event) => setSummary(event.target.value)} /></label><span className="eyebrow">Documents to share</span>{availableDocuments.length ? <div className="share-documents">{availableDocuments.map((document) => <label key={document.id}><input type="checkbox" checked={selectedDocuments.includes(document.id)} onChange={() => setSelectedDocuments((current) => current.includes(document.id) ? current.filter((id) => id !== document.id) : [...current, document.id])} /><div><strong>{document.title}</strong><small>{document.files.length} file(s) · {document.status}</small></div></label>)}</div> : <p className="muted">No documents are available to share. You can still book the consultation.</p>}</div>}
-    {step === 4 && <div className="booking-content booking-review"><h3>Review and consent</h3><div className="review-grid"><div><small>Service</small><strong>{service.title}</strong></div><div><small>Price</small><strong>{useCredit ? 'Included expert credit' : formatUsd(service.priceUsd, profile.preferredCurrency)}</strong></div><div><small>Schedule</small><strong>{date} · {time}</strong></div><div><small>Documents</small><strong>{selectedDocuments.length} selected</strong></div></div>{availableExpertCredits > 0 && <label className="credit-choice"><input type="checkbox" checked={useCredit} onChange={(event) => setUseCredit(event.target.checked)} /><span>Use one of my {availableExpertCredits} expert credit(s) for this booking.</span></label>}<div className="case-preview"><small>Case summary</small><p>{summary}</p></div><label className="consent-box"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} /><span>I consent to sharing this case summary and the selected prototype document metadata with {expert.name} for this consultation. No actual file contents are transmitted in this prototype.</span></label></div>}
+    {step === 4 && <div className="booking-content booking-review"><h3>Review and consent</h3><div className="review-grid"><div><small>Service</small><strong>{service.title}</strong></div><div><small>Price</small><strong>{useCredit ? 'Included expert credit' : formatUsd(service.priceUsd, profile)}</strong></div><div><small>Schedule</small><strong>{formatProfileDate(date, profile)} · {time}</strong></div><div><small>Documents</small><strong>{selectedDocuments.length} selected</strong></div></div>{availableExpertCredits > 0 && <label className="credit-choice"><input type="checkbox" checked={useCredit} onChange={(event) => setUseCredit(event.target.checked)} /><span>Use one of my {availableExpertCredits} expert credit(s) for this booking.</span></label>}<div className="case-preview"><small>Case summary</small><p>{summary}</p></div><label className="consent-box"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} /><span>I consent to sharing this case summary and the selected prototype document metadata with {expert.name} for this consultation. No actual file contents are transmitted in this prototype.</span></label></div>}
     <div className="booking-actions"><button className="text-button" disabled={step === 1} onClick={() => setStep((value) => value - 1)}>← Back</button>{step < 4 ? <button className="primary" onClick={() => setStep((value) => value + 1)}>Continue →</button> : <button className="primary" disabled={!consent} onClick={confirm}>Confirm mock booking</button>}</div>
   </section></div>
 }
 
-function formatUsd(valueUsd: number, currencyCode: string) {
-  return formatPreferredCurrency(valueUsd * 122, currencyCode)
+function formatUsd(valueUsd: number, profile: UserProfile) {
+  return formatPreferredCurrency(valueUsd * 122, profile.preferredCurrency, profile.interfaceLanguage)
 }
 
 function Subscription({ profile, subscription, setSubscription, savedCount, documentFolderCount, bookingCount }: {
@@ -829,7 +856,7 @@ function Subscription({ profile, subscription, setSubscription, savedCount, docu
         {toast && <Toast message={toast} onClose={() => setToast('')} />}
         <section className="subscription-hero">
           <div><span className="eyebrow light">Current plan</span><h2>{currentPlan.name}</h2><p>{currentPlan.tagline}</p><div className="renewal-line">{subscription.renewsAt === 'No renewal' ? 'Free plan · no billing' : `Renews ${subscription.renewsAt} · ${subscription.billingCycle} billing`}</div></div>
-          <div className="plan-price"><strong>{currentPlan.monthlyUsd === 0 ? 'Free' : formatUsd(subscription.billingCycle === 'annual' ? currentPlan.annualUsd : currentPlan.monthlyUsd, profile.preferredCurrency)}</strong><span>{currentPlan.monthlyUsd === 0 ? 'forever' : subscription.billingCycle === 'annual' ? 'per year' : 'per month'}</span></div>
+          <div className="plan-price"><strong>{currentPlan.monthlyUsd === 0 ? 'Free' : formatUsd(subscription.billingCycle === 'annual' ? currentPlan.annualUsd : currentPlan.monthlyUsd, profile)}</strong><span>{currentPlan.monthlyUsd === 0 ? 'forever' : subscription.billingCycle === 'annual' ? 'per year' : 'per month'}</span></div>
         </section>
 
         <section className="usage-panel panel">
@@ -849,7 +876,7 @@ function Subscription({ profile, subscription, setSubscription, savedCount, docu
           return <article className={`plan-card ${plan.recommended ? 'recommended' : ''} ${current ? 'current' : ''}`} key={plan.id}>
             {plan.recommended && <span className="recommended-label">Recommended</span>}
             <div className="plan-card-heading"><div><span className="eyebrow">{current ? 'Your plan' : plan.name}</span><h3>{plan.name}</h3></div>{current && <span className="current-check">✓</span>}</div>
-            <p>{plan.tagline}</p><div className="plan-card-price"><strong>{price === 0 ? 'Free' : formatUsd(price, profile.preferredCurrency)}</strong><span>{price === 0 ? 'No payment' : billingCycle === 'annual' ? '/ year' : '/ month'}</span></div>
+            <p>{plan.tagline}</p><div className="plan-card-price"><strong>{price === 0 ? 'Free' : formatUsd(price, profile)}</strong><span>{price === 0 ? 'No payment' : billingCycle === 'annual' ? '/ year' : '/ month'}</span></div>
             <ul>{plan.features.map((feature) => <li key={feature}>✓ {feature}</li>)}</ul>
             <div className="plan-limits"><span>{plan.limits.shortlist >= 999 ? 'Unlimited' : plan.limits.shortlist} saved programmes</span><span>{plan.limits.adviserMessages} adviser messages</span><span>{plan.limits.expertCredits} expert credit(s)</span></div>
             <button className={current ? 'secondary wide' : 'primary wide'} disabled={current} onClick={() => setPendingPlan(plan)}>{current ? 'Current plan' : plan.monthlyUsd > currentPlan.monthlyUsd ? 'Upgrade plan' : 'Change plan'}</button>
@@ -858,7 +885,7 @@ function Subscription({ profile, subscription, setSubscription, savedCount, docu
 
         <section className="billing-note"><span>i</span><div><strong>Prototype billing</strong><p>No payment method is collected. Plan changes only update local browser entitlements so you can test feature access and usage.</p></div></section>
       </div>
-      {pendingPlan && <div className="modal-backdrop"><section className="plan-confirm-modal"><button className="modal-close" onClick={() => setPendingPlan(null)}>×</button><span className="eyebrow">Confirm plan change</span><h2>{currentPlan.name} → {pendingPlan.name}</h2><p>Your prototype entitlements will update immediately. No payment will be processed.</p><div className="confirmation-price"><small>{billingCycle} price</small><strong>{pendingPlan.monthlyUsd === 0 ? 'Free' : formatUsd(billingCycle === 'annual' ? pendingPlan.annualUsd : pendingPlan.monthlyUsd, profile.preferredCurrency)}</strong></div><div className="plan-confirm-actions"><button className="secondary" onClick={() => setPendingPlan(null)}>Cancel</button><button className="primary" onClick={applyPlan}>Confirm change</button></div></section></div>}
+      {pendingPlan && <div className="modal-backdrop"><section className="plan-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="plan-change-title"><button className="modal-close" aria-label="Close plan change" onClick={() => setPendingPlan(null)}>×</button><span className="eyebrow">Confirm plan change</span><h2 id="plan-change-title">{currentPlan.name} → {pendingPlan.name}</h2><p>Your prototype entitlements will update immediately. No payment will be processed.</p><div className="confirmation-price"><small>{billingCycle} price</small><strong>{pendingPlan.monthlyUsd === 0 ? 'Free' : formatUsd(billingCycle === 'annual' ? pendingPlan.annualUsd : pendingPlan.monthlyUsd, profile)}</strong></div><div className="plan-confirm-actions"><button className="secondary" onClick={() => setPendingPlan(null)}>Cancel</button><button className="primary" onClick={applyPlan}>Confirm change</button></div></section></div>}
     </>
   )
 }
@@ -991,13 +1018,28 @@ function Documents({ documents, onChange, onProfileUpdate, setView, plan, onUpgr
 }
 
 function Toast({ message, onClose }: { message: string, onClose: () => void }) {
-  return <div className="toast"><span>✓</span><strong>{message}</strong><button onClick={onClose}>×</button></div>
+  return <div className="toast" role="status" aria-live="polite"><span>✓</span><strong>{message}</strong><button aria-label="Dismiss notification" onClick={onClose}>×</button></div>
 }
 
 function Profile({ profile, onSave }: { profile: UserProfile, onSave: (profile: UserProfile) => void }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(profile)
+  const regionalDefaults = countryPreferenceDefaults[draft.country]
   const save = () => { onSave(draft); setEditing(false) }
+  const applyRegionalDefaults = () => {
+    if (!regionalDefaults) return
+    setDraft((current) => ({
+      ...current,
+      preferredCurrency: regionalDefaults.currency,
+      timezone: regionalDefaults.timezone,
+      dateFormat: regionalDefaults.dateFormat,
+      weekStartsOn: regionalDefaults.weekStartsOn,
+    }))
+  }
+  const addSuggestedDestination = (country: string) => setDraft((current) => ({
+    ...current,
+    preferredCountries: current.preferredCountries.includes(country) ? current.preferredCountries : [...current.preferredCountries, country],
+  }))
   return (
     <>
       <Topbar title="My profile" />
@@ -1011,17 +1053,25 @@ function Profile({ profile, onSave }: { profile: UserProfile, onSave: (profile: 
           <Autocomplete label="Target subject" value={draft.subject} options={subjects} onChange={(subject) => setDraft({ ...draft, subject })} placeholder="Start typing a subject" />
           <label>Preferred intake<select value={draft.preferredIntake} onChange={(e) => setDraft({ ...draft, preferredIntake: e.target.value })}><option>Fall 2027</option><option>Spring 2027</option><option>Fall 2028</option></select></label>
           <Autocomplete label="Current country" value={draft.country} options={countries} onChange={(country) => setDraft({ ...draft, country })} placeholder="Start typing a country" />
+          <label>Current city<input value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} /></label>
           <MultiAutocomplete label="Preferred countries" values={draft.preferredCountries} options={countries} onChange={(preferredCountries) => setDraft({ ...draft, preferredCountries })} />
           <label>Preferred currency<select value={draft.preferredCurrency} onChange={(e) => setDraft({ ...draft, preferredCurrency: e.target.value })}>{currencies.map((currency) => <option value={currency.code} key={currency.code}>{currency.code} — {currency.label}</option>)}</select></label>
           <label>Annual budget ({draft.preferredCurrency})<input type="number" step="1000" value={bdtToPreferred(draft.annualBudgetBdt, draft.preferredCurrency)} onChange={(e) => setDraft({ ...draft, annualBudgetBdt: preferredToBdt(Number(e.target.value), draft.preferredCurrency) })} /></label>
+          <label>Interface language<select value={draft.interfaceLanguage} onChange={(e) => setDraft({ ...draft, interfaceLanguage: e.target.value as UserProfile['interfaceLanguage'] })}><option value="en">English</option><option value="bn">বাংলা (Bangla preview)</option></select></label>
+          <label>Timezone<select value={draft.timezone} onChange={(e) => setDraft({ ...draft, timezone: e.target.value })}>{timezones.map((timezone) => <option key={timezone}>{timezone}</option>)}</select></label>
+          <label>Date format<select value={draft.dateFormat} onChange={(e) => setDraft({ ...draft, dateFormat: e.target.value as UserProfile['dateFormat'] })}><option value="day-first">Day first · 18 Jun 2026</option><option value="month-first">Month first · Jun 18, 2026</option><option value="iso">ISO · 2026-06-18</option></select></label>
+          <label>Week starts on<select value={draft.weekStartsOn} onChange={(e) => setDraft({ ...draft, weekStartsOn: e.target.value as UserProfile['weekStartsOn'] })}><option value="monday">Monday</option><option value="sunday">Sunday</option></select></label>
           <label>IELTS status<select value={draft.ieltsStatus} onChange={(e) => setDraft({ ...draft, ieltsStatus: e.target.value as UserProfile['ieltsStatus'] })}><option value="not-planned">Not planned</option><option value="planning">Planning</option><option value="completed">Completed</option></select></label>
           <label>IELTS score<input type="number" min="0" max="9" step=".5" value={draft.ieltsScore} onChange={(e) => setDraft({ ...draft, ieltsScore: Number(e.target.value) })} disabled={draft.ieltsStatus !== 'completed'} /></label>
           <label className="check-field"><input type="checkbox" checked={draft.transcriptReady} onChange={(e) => setDraft({ ...draft, transcriptReady: e.target.checked })} /> Transcript is ready</label>
           <label className="check-field"><input type="checkbox" checked={draft.sponsorReady} onChange={(e) => setDraft({ ...draft, sponsorReady: e.target.checked })} /> Sponsor/funding evidence is ready</label>
-        </div><div className="profile-save"><button className="primary" onClick={save}>Save and recalculate guidance →</button></div></section> :
+        </div>
+        {regionalDefaults && <div className="regional-suggestions"><div><span className="eyebrow">Regional starting point</span><strong>Suggested for {draft.country}</strong><small>{regionalDefaults.currency} · {regionalDefaults.timezone} · {regionalDefaults.weekStartsOn} week start</small></div><button className="secondary" onClick={applyRegionalDefaults}>Apply regional defaults</button><div className="destination-suggestions"><small>Common destination ideas from this market</small>{regionalDefaults.destinations.map((country) => <button key={country} disabled={draft.preferredCountries.includes(country)} onClick={() => addSuggestedDestination(country)}>{draft.preferredCountries.includes(country) ? '✓ ' : '+ '}{country}</button>)}</div></div>}
+        <div className="profile-save"><button className="primary" onClick={save}>Save and recalculate guidance →</button></div></section> :
         <div className="profile-grid">
           <section className="panel"><div className="section-title"><h2>Academic background</h2><span className="verified">Profile data</span></div><div className="info-row"><small>Current degree</small><strong>{profile.currentDegree}</strong></div><div className="info-row"><small>Institution</small><strong>{profile.institution}</strong></div><div className="info-row"><small>CGPA</small><strong>{profile.cgpa.toFixed(2)} / 4.00</strong></div><div className="info-row"><small>IELTS</small><strong>{profile.ieltsStatus === 'completed' ? profile.ieltsScore : profile.ieltsStatus}</strong></div></section>
-          <section className="panel"><div className="section-title"><h2>Study preferences</h2></div><div className="info-row"><small>Target</small><strong>{profile.targetDegree} · {profile.subject}</strong></div><div className="info-row"><small>Preferred intake</small><strong>{profile.preferredIntake}</strong></div><div className="info-row"><small>Destinations</small><strong>{profile.preferredCountries.join(', ')}</strong></div><div className="info-row"><small>Annual budget</small><strong>{formatPreferredCurrency(profile.annualBudgetBdt, profile.preferredCurrency)}</strong></div><div className="info-row"><small>Display currency</small><strong>{profile.preferredCurrency}</strong></div></section>
+          <section className="panel"><div className="section-title"><h2>Study preferences</h2></div><div className="info-row"><small>Target</small><strong>{profile.targetDegree} · {profile.subject}</strong></div><div className="info-row"><small>Preferred intake</small><strong>{profile.preferredIntake}</strong></div><div className="info-row"><small>Destinations</small><strong>{profile.preferredCountries.join(', ')}</strong></div><div className="info-row"><small>Annual budget</small><strong>{formatProfileCurrency(profile.annualBudgetBdt, profile)}</strong></div><div className="info-row"><small>Display currency</small><strong>{profile.preferredCurrency}</strong></div></section>
+          <section className="panel global-preferences-panel"><div className="section-title"><h2>Global preferences</h2><span className="verified">{profile.interfaceLanguage === 'bn' ? 'বাংলা preview' : 'English'}</span></div><div className="info-row"><small>Location</small><strong>{profile.city}, {profile.country}</strong></div><div className="info-row"><small>Timezone</small><strong>{profile.timezone}</strong></div><div className="info-row"><small>Date preview</small><strong>{formatProfileDate('2026-06-18', profile)}</strong></div><div className="info-row"><small>Week starts</small><strong className="capitalize">{profile.weekStartsOn}</strong></div></section>
         </div>}
       </div>
     </>
@@ -1046,6 +1096,10 @@ function App() {
     usage: { adviserMessages: 4, comparisons: 1, expertCredits: 0 },
   })
   const [appToast, setAppToast] = useState('')
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false)
+  useEffect(() => {
+    document.documentElement.lang = profile.interfaceLanguage
+  }, [profile.interfaceLanguage])
   const normalizedDocuments = useMemo(() => normalizeDocuments(documents), [documents])
   useEffect(() => {
     if (JSON.stringify(documents) !== JSON.stringify(normalizedDocuments)) setDocuments(normalizedDocuments)
@@ -1092,8 +1146,9 @@ function App() {
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-workspace">Skip to main content</a>
       <Sidebar view={view} setView={setView} onLogout={logout} documentCount={missingDocuments} planId={currentPlan.id} onLocked={requestUpgrade} />
-      <main className="workspace">
+      <main className="workspace" id="main-workspace" tabIndex={-1}>
         {appToast && <Toast message={appToast} onClose={() => setAppToast('')} />}
         {view === 'dashboard' && <Dashboard setView={setView} openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} profile={profile} scores={scores} notifications={notifications} plan={currentPlan} />}
         {view === 'study-plan' && <StudyPlan profile={profile} documents={normalizedDocuments} savedIds={savedIds} scores={scores} applications={applications} setApplications={setApplications} setView={setView} openProgram={openProgram} />}
@@ -1115,12 +1170,23 @@ function App() {
           ['explore', '⌕', 'Explore'],
           ['shortlist', '◇', 'Saved', 'shortlist'],
           ['documents', '▤', 'Docs', 'documents'],
-          ['experts', '◉', 'Experts', 'expertBooking'],
         ] as [View, string, string, GatedFeature?][]).map(([id, icon, label, feature]) => {
           const locked = Boolean(feature && !canUseFeature(currentPlan.id, feature))
           return <button className={`${view === id || (view === 'program' && id === 'explore') ? 'active' : ''} ${locked ? 'locked' : ''}`} onClick={() => locked && feature ? requestUpgrade(feature) : setView(id)} key={id}><span>{icon}</span>{label}{locked && <em>⌁</em>}</button>
         })}
+        <button className={mobileMoreOpen ? 'active' : ''} aria-expanded={mobileMoreOpen} onClick={() => setMobileMoreOpen((open) => !open)}><span>•••</span>More</button>
       </nav>
+      {mobileMoreOpen && <div className="mobile-more-backdrop" onClick={() => setMobileMoreOpen(false)}><section className="mobile-more-sheet" aria-label="More navigation" onClick={(event) => event.stopPropagation()}><div><strong>More tools</strong><button aria-label="Close more navigation" onClick={() => setMobileMoreOpen(false)}>×</button></div>{([
+        ['scholarships', '$', 'Scholarships', 'scholarships'],
+        ['roadmap', '✓', 'My roadmap', 'roadmap'],
+        ['adviser', '✦', 'Ask Navigator', 'adviser'],
+        ['experts', '◉', 'Expert consultations', 'expertBooking'],
+        ['subscription', '◆', 'Plans & usage'],
+        ['profile', '○', 'My profile'],
+      ] as [View, string, string, GatedFeature?][]).map(([id, icon, label, feature]) => {
+        const locked = Boolean(feature && !canUseFeature(currentPlan.id, feature))
+        return <button key={id} className={locked ? 'locked' : ''} onClick={() => { setMobileMoreOpen(false); if (locked && feature) requestUpgrade(feature); else setView(id) }}><span>{icon}</span><strong>{label}</strong>{locked && <em>{minimumPlanName(feature!)}</em>}</button>
+      })}</section></div>}
     </div>
   )
 }

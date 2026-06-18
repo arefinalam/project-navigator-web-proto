@@ -84,6 +84,10 @@ export type UserProfile = {
   preferredIntake: string
   preferredCountries: string[]
   preferredCurrency: string
+  interfaceLanguage: 'en' | 'bn'
+  timezone: string
+  dateFormat: 'day-first' | 'month-first' | 'iso'
+  weekStartsOn: 'monday' | 'sunday'
   annualBudgetBdt: number
   ieltsStatus: 'not-planned' | 'planning' | 'completed'
   ieltsScore: number

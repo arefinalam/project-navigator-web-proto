@@ -46,3 +46,28 @@ export const currencies = [
   { code: 'SGD', label: 'Singapore Dollar', symbol: 'S$', bdtPerUnit: 95 },
   { code: 'AED', label: 'UAE Dirham', symbol: 'AED', bdtPerUnit: 33.2 },
 ]
+
+export const timezones = [
+  'Asia/Dhaka', 'Asia/Kolkata', 'Asia/Kuala_Lumpur', 'Asia/Singapore',
+  'Asia/Dubai', 'Asia/Tokyo', 'Australia/Sydney', 'Europe/Berlin',
+  'Europe/Helsinki', 'Europe/London', 'Europe/Paris', 'Europe/Stockholm',
+  'America/Toronto', 'America/New_York', 'America/Los_Angeles',
+]
+
+export const countryPreferenceDefaults: Record<string, {
+  currency: string
+  timezone: string
+  dateFormat: 'day-first' | 'month-first' | 'iso'
+  weekStartsOn: 'monday' | 'sunday'
+  destinations: string[]
+}> = {
+  Bangladesh: { currency: 'BDT', timezone: 'Asia/Dhaka', dateFormat: 'day-first', weekStartsOn: 'sunday', destinations: ['Germany', 'Finland', 'United Kingdom', 'Canada'] },
+  India: { currency: 'INR', timezone: 'Asia/Kolkata', dateFormat: 'day-first', weekStartsOn: 'monday', destinations: ['Germany', 'United Kingdom', 'Canada', 'Australia'] },
+  Malaysia: { currency: 'USD', timezone: 'Asia/Kuala_Lumpur', dateFormat: 'day-first', weekStartsOn: 'monday', destinations: ['Australia', 'United Kingdom', 'Singapore', 'Germany'] },
+  'United Arab Emirates': { currency: 'AED', timezone: 'Asia/Dubai', dateFormat: 'day-first', weekStartsOn: 'monday', destinations: ['United Kingdom', 'Canada', 'Australia', 'Germany'] },
+  'United Kingdom': { currency: 'GBP', timezone: 'Europe/London', dateFormat: 'day-first', weekStartsOn: 'monday', destinations: ['Germany', 'Netherlands', 'Ireland', 'Canada'] },
+  'United States': { currency: 'USD', timezone: 'America/New_York', dateFormat: 'month-first', weekStartsOn: 'sunday', destinations: ['Canada', 'United Kingdom', 'Germany', 'Netherlands'] },
+  Canada: { currency: 'CAD', timezone: 'America/Toronto', dateFormat: 'month-first', weekStartsOn: 'sunday', destinations: ['United States', 'United Kingdom', 'Germany', 'Australia'] },
+  Australia: { currency: 'AUD', timezone: 'Australia/Sydney', dateFormat: 'day-first', weekStartsOn: 'monday', destinations: ['United Kingdom', 'Canada', 'Germany', 'New Zealand'] },
+  Germany: { currency: 'EUR', timezone: 'Europe/Berlin', dateFormat: 'day-first', weekStartsOn: 'monday', destinations: ['Netherlands', 'Finland', 'Sweden', 'United Kingdom'] },
+}

@@ -15,6 +15,10 @@ export const defaultProfile: UserProfile = {
   preferredIntake: 'Fall 2027',
   preferredCountries: ['Germany', 'Finland', 'Netherlands'],
   preferredCurrency: 'USD',
+  interfaceLanguage: 'en',
+  timezone: 'Asia/Dhaka',
+  dateFormat: 'day-first',
+  weekStartsOn: 'sunday',
   annualBudgetBdt: 2500000,
   ieltsStatus: 'planning',
   ieltsScore: 0,
@@ -111,14 +115,37 @@ export function lakh(value: number) {
   return `BDT ${(value / 100000).toFixed(1)} lakh`
 }
 
-export function formatPreferredCurrency(valueBdt: number, currencyCode: string) {
+export function localeForLanguage(language: UserProfile['interfaceLanguage']) {
+  return language === 'bn' ? 'bn-BD' : 'en-US'
+}
+
+export function formatPreferredCurrency(valueBdt: number, currencyCode: string, language: UserProfile['interfaceLanguage'] = 'en') {
   const currency = currencies.find((item) => item.code === currencyCode) ?? currencies[0]
   const value = valueBdt / currency.bdtPerUnit
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat(localeForLanguage(language), {
     style: 'currency',
     currency: currency.code,
     maximumFractionDigits: currency.code === 'JPY' ? 0 : 0,
   }).format(value)
+}
+
+export function formatProfileCurrency(valueBdt: number, profile: UserProfile) {
+  return formatPreferredCurrency(valueBdt, profile.preferredCurrency, profile.interfaceLanguage)
+}
+
+export function formatProfileDate(value: string, profile: UserProfile) {
+  const date = new Date(`${value}T12:00:00`)
+  if (Number.isNaN(date.getTime())) return value
+  if (profile.dateFormat === 'iso') return date.toISOString().slice(0, 10)
+  const locale = profile.interfaceLanguage === 'bn'
+    ? 'bn-BD'
+    : profile.dateFormat === 'day-first' ? 'en-GB' : 'en-US'
+  return new Intl.DateTimeFormat(locale, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: profile.timezone,
+  }).format(date)
 }
 
 export function preferredToBdt(value: number, currencyCode: string) {
