@@ -9,6 +9,7 @@ export type View =
   | 'documents'
   | 'study-plan'
   | 'experts'
+  | 'subscription'
   | 'profile'
 
 export type Program = {
@@ -217,4 +218,35 @@ export type ConsultationBooking = {
   consent: boolean
   status: 'confirmed' | 'completed' | 'cancelled'
   expertNotes?: string
+}
+
+export type PlanId = 'free' | 'essential' | 'plus' | 'expert'
+
+export type SubscriptionPlan = {
+  id: PlanId
+  name: string
+  tagline: string
+  monthlyUsd: number
+  annualUsd: number
+  recommended?: boolean
+  features: string[]
+  limits: {
+    activeGoals: number
+    shortlist: number
+    comparisons: number
+    adviserMessages: number
+    documentFolders: number
+    expertCredits: number
+  }
+}
+
+export type SubscriptionState = {
+  planId: PlanId
+  billingCycle: 'monthly' | 'annual'
+  renewsAt: string
+  usage: {
+    adviserMessages: number
+    comparisons: number
+    expertCredits: number
+  }
 }

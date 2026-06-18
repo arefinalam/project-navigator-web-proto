@@ -8,8 +8,9 @@ import { countries, currencies, subjects, universities } from './data/referenceD
 import { defaultDocuments } from './data/documents'
 import { studyPhases } from './data/studyPlan'
 import { experts } from './data/experts'
+import { plans } from './data/plans'
 import { bdtToPreferred, buildNotifications, defaultProfile, estimateCost, formatPreferredCurrency, preferredToBdt, scoreProgram } from './lib/personalization'
-import type { ApplicationRecord, ApplicationStatus, AppNotification, ChatMessage, ConsultationBooking, DocumentFile, Expert, Program, ProgramScore, RoadmapItem, Scholarship, StudyPhaseId, UserDocument, UserProfile, View } from './types'
+import type { ApplicationRecord, ApplicationStatus, AppNotification, ChatMessage, ConsultationBooking, DocumentFile, Expert, Program, ProgramScore, RoadmapItem, Scholarship, StudyPhaseId, SubscriptionPlan, SubscriptionState, UserDocument, UserProfile, View } from './types'
 import './App.css'
 
 type AuthMode = 'login' | 'signup'
@@ -183,6 +184,7 @@ function Sidebar({ view, setView, onLogout, documentCount }: { view: View, setVi
     { id: 'documents', label: 'Documents', icon: '▤' },
     { id: 'adviser', label: 'Ask Navigator', icon: '✦' },
     { id: 'experts', label: 'Expert consultations', icon: '◉' },
+    { id: 'subscription', label: 'Plans & usage', icon: '◆' },
     { id: 'profile', label: 'My profile', icon: '○' },
   ]
   return (
@@ -205,7 +207,7 @@ function Topbar({ title, notifications = [], onNotification }: { title: string, 
   return <header className="topbar"><div><span className="mobile-logo"><Logo /></span><h1>{title}</h1></div><div className="top-actions"><button aria-label="Notifications" onClick={() => setOpen((value) => !value)}>♢{notifications.length > 0 && <span className="notification-dot" />}</button><div className="avatar">SR</div>{open && <div className="notification-menu"><div className="notification-title"><strong>Notifications</strong><span>{notifications.length} new</span></div>{notifications.map((item) => <button className="notification-item" key={item.id} onClick={() => { onNotification?.(item); setOpen(false) }}><span className={`notice-icon ${item.type}`}>{item.type === 'funding' ? '$' : item.type === 'deadline' ? '!' : item.type === 'profile' ? '○' : '✦'}</span><div><strong>{item.title}</strong><small>{item.detail}</small></div></button>)}</div>}</div></header>
 }
 
-function ProgramCard({ program, score, profile, onOpen, saved, compared, onSave, onCompare }: {
+function ProgramCard({ program, score, profile, onOpen, saved, compared, onSave, onCompare, saveDisabled = false, compareDisabled = false }: {
   program: Program
   score: ProgramScore
   profile: UserProfile
@@ -214,13 +216,15 @@ function ProgramCard({ program, score, profile, onOpen, saved, compared, onSave,
   compared: boolean
   onSave: () => void
   onCompare: () => void
+  saveDisabled?: boolean
+  compareDisabled?: boolean
 }) {
   return (
     <article className="program-card">
       <div className="program-top">
         <div className="uni-logo" style={{ background: program.accent }}>{program.university.split(' ').map((word) => word[0]).slice(0, 2).join('')}</div>
         <div className="card-actions">
-          <button className={saved ? 'saved' : ''} onClick={onSave} aria-label={saved ? 'Remove from shortlist' : 'Save to shortlist'}>{saved ? '♥' : '♡'}</button>
+          <button className={saved ? 'saved' : ''} disabled={saveDisabled && !saved} onClick={onSave} aria-label={saved ? 'Remove from shortlist' : 'Save to shortlist'} title={saveDisabled && !saved ? 'Your current plan shortlist limit has been reached.' : ''}>{saved ? '♥' : '♡'}</button>
           <div className="match-ring" style={{ '--score': `${score.overall * 3.6}deg` } as React.CSSProperties}><span>{score.overall}%</span></div>
         </div>
       </div>
@@ -235,14 +239,14 @@ function ProgramCard({ program, score, profile, onOpen, saved, compared, onSave,
       <div className="score-mini"><span>Academic {score.academic}%</span><span>Budget {score.budget}%</span></div>
       <ExternalLink href={program.programUrl} className="card-source">Official programme page</ExternalLink>
       <div className="program-card-footer">
-        <label><input type="checkbox" checked={compared} onChange={onCompare} /> Compare</label>
+        <label className={compareDisabled && !compared ? 'disabled-control' : ''}><input type="checkbox" disabled={compareDisabled && !compared} checked={compared} onChange={onCompare} /> Compare</label>
         <button onClick={onOpen}>View match <span>→</span></button>
       </div>
     </article>
   )
 }
 
-function Dashboard({ setView, openProgram, savedIds, compareIds, toggleSaved, toggleCompare, profile, scores, notifications }: {
+function Dashboard({ setView, openProgram, savedIds, compareIds, toggleSaved, toggleCompare, profile, scores, notifications, plan }: {
   setView: (view: View) => void
   openProgram: (program: Program) => void
   savedIds: string[]
@@ -252,6 +256,7 @@ function Dashboard({ setView, openProgram, savedIds, compareIds, toggleSaved, to
   profile: UserProfile
   scores: Record<string, ProgramScore>
   notifications: AppNotification[]
+  plan: SubscriptionPlan
 }) {
   const topPrograms = [...programs].sort((a, b) => scores[b.id].overall - scores[a.id].overall).slice(0, 3)
   const readiness = Math.round((profile.cgpa / 4 * 35) + (profile.ieltsStatus === 'completed' ? 30 : profile.ieltsStatus === 'planning' ? 18 : 5) + (profile.transcriptReady ? 20 : 8) + (profile.sponsorReady ? 15 : 7))
@@ -285,14 +290,14 @@ function Dashboard({ setView, openProgram, savedIds, compareIds, toggleSaved, to
 
         <section className="recommend-section">
           <div className="section-title"><div><span className="eyebrow">Recommended for you</span><h2>Your strongest program matches</h2></div><button className="text-button" onClick={() => setView('explore')}>Explore all programs →</button></div>
-          <div className="program-grid">{topPrograms.map((program) => <ProgramCard key={program.id} program={program} score={scores[program.id]} profile={profile} onOpen={() => openProgram(program)} saved={savedIds.includes(program.id)} compared={compareIds.includes(program.id)} onSave={() => toggleSaved(program.id)} onCompare={() => toggleCompare(program.id)} />)}</div>
+          <div className="program-grid">{topPrograms.map((program) => <ProgramCard key={program.id} program={program} score={scores[program.id]} profile={profile} onOpen={() => openProgram(program)} saved={savedIds.includes(program.id)} compared={compareIds.includes(program.id)} saveDisabled={savedIds.length >= plan.limits.shortlist} compareDisabled={compareIds.length >= plan.limits.comparisons} onSave={() => toggleSaved(program.id)} onCompare={() => toggleCompare(program.id)} />)}</div>
         </section>
       </div>
     </>
   )
 }
 
-function Explore({ openProgram, savedIds, compareIds, toggleSaved, toggleCompare, openCompare, scores, profile }: {
+function Explore({ openProgram, savedIds, compareIds, toggleSaved, toggleCompare, openCompare, scores, profile, plan }: {
   openProgram: (program: Program) => void
   savedIds: string[]
   compareIds: string[]
@@ -301,6 +306,7 @@ function Explore({ openProgram, savedIds, compareIds, toggleSaved, toggleCompare
   openCompare: () => void
   scores: Record<string, ProgramScore>
   profile: UserProfile
+  plan: SubscriptionPlan
 }) {
   const [country, setCountry] = useState('All countries')
   const [query, setQuery] = useState('')
@@ -320,13 +326,13 @@ function Explore({ openProgram, savedIds, compareIds, toggleSaved, toggleCompare
           <span>{filtered.length} programs · {compareIds.length}/3 selected</span>
         </div>
         {compareIds.length >= 2 && <div className="compare-banner"><span><strong>{compareIds.length} programs selected.</strong> See their cost, match and funding side by side.</span><button onClick={openCompare}>Compare now →</button></div>}
-        <div className="program-grid wide-grid">{filtered.map((program) => <ProgramCard key={program.id} program={program} score={scores[program.id]} profile={profile} onOpen={() => openProgram(program)} saved={savedIds.includes(program.id)} compared={compareIds.includes(program.id)} onSave={() => toggleSaved(program.id)} onCompare={() => toggleCompare(program.id)} />)}</div>
+        <div className="program-grid wide-grid">{filtered.map((program) => <ProgramCard key={program.id} program={program} score={scores[program.id]} profile={profile} onOpen={() => openProgram(program)} saved={savedIds.includes(program.id)} compared={compareIds.includes(program.id)} saveDisabled={savedIds.length >= plan.limits.shortlist} compareDisabled={compareIds.length >= plan.limits.comparisons} onSave={() => toggleSaved(program.id)} onCompare={() => toggleCompare(program.id)} />)}</div>
       </div>
     </>
   )
 }
 
-function Shortlist({ savedIds, compareIds, openProgram, toggleSaved, toggleCompare, scores, profile }: {
+function Shortlist({ savedIds, compareIds, openProgram, toggleSaved, toggleCompare, scores, profile, plan }: {
   savedIds: string[]
   compareIds: string[]
   openProgram: (program: Program) => void
@@ -334,6 +340,7 @@ function Shortlist({ savedIds, compareIds, openProgram, toggleSaved, toggleCompa
   toggleCompare: (id: string) => void
   scores: Record<string, ProgramScore>
   profile: UserProfile
+  plan: SubscriptionPlan
 }) {
   const savedPrograms = programs.filter((program) => savedIds.includes(program.id))
   const comparedPrograms = programs.filter((program) => compareIds.includes(program.id))
@@ -370,7 +377,7 @@ function Shortlist({ savedIds, compareIds, openProgram, toggleSaved, toggleCompa
 
         <section className="recommend-section">
           <div className="section-title"><div><span className="eyebrow">Saved options</span><h2>Your shortlist</h2></div></div>
-          {savedPrograms.length ? <div className="program-grid">{savedPrograms.map((program) => <ProgramCard key={program.id} program={program} score={scores[program.id]} profile={profile} onOpen={() => openProgram(program)} saved compared={compareIds.includes(program.id)} onSave={() => toggleSaved(program.id)} onCompare={() => toggleCompare(program.id)} />)}</div> : <EmptyState title="No programs saved yet" text="Explore your matches and save the options you want to revisit." />}
+          {savedPrograms.length ? <div className="program-grid">{savedPrograms.map((program) => <ProgramCard key={program.id} program={program} score={scores[program.id]} profile={profile} onOpen={() => openProgram(program)} saved compared={compareIds.includes(program.id)} compareDisabled={compareIds.length >= plan.limits.comparisons} onSave={() => toggleSaved(program.id)} onCompare={() => toggleCompare(program.id)} />)}</div> : <EmptyState title="No programs saved yet" text="Explore your matches and save the options you want to revisit." />}
         </section>
       </div>
     </>
@@ -424,7 +431,7 @@ const adviserReplies = [
   }
 ]
 
-function Adviser() {
+function Adviser({ plan, subscription, setSubscription, openPlans }: { plan: SubscriptionPlan, subscription: SubscriptionState, setSubscription: React.Dispatch<React.SetStateAction<SubscriptionState>>, openPlans: () => void }) {
   const [input, setInput] = useState('')
   const [messages, setMessages] = usePersistentState<ChatMessage[]>('navigator-chat', [{
     id: 1,
@@ -434,6 +441,10 @@ function Adviser() {
   }])
 
   const send = (question?: string) => {
+    if (subscription.usage.adviserMessages >= plan.limits.adviserMessages) {
+      openPlans()
+      return
+    }
     const text = (question ?? input).trim()
     if (!text) return
     const lower = text.toLowerCase()
@@ -442,6 +453,7 @@ function Adviser() {
       sources: ['Your roadmap', 'Current match scores']
     }
     setMessages((current) => [...current, { id: Date.now(), role: 'user', text }, { id: Date.now() + 1, role: 'assistant', text: response.text, sources: response.sources }])
+    setSubscription((current) => ({ ...current, usage: { ...current.usage, adviserMessages: current.usage.adviserMessages + 1 } }))
     setInput('')
   }
 
@@ -450,7 +462,7 @@ function Adviser() {
       <Topbar title="Ask Navigator" />
       <div className="page-content adviser-page">
         <section className="chat-shell">
-          <div className="chat-header"><div className="navigator-orb">N</div><div><span className="eyebrow">Mock AI adviser</span><h2>Navigator</h2><p>Answers from your profile and prototype data—not live AI yet.</p></div><span className="online-pill">● Ready</span></div>
+          <div className="chat-header"><div className="navigator-orb">N</div><div><span className="eyebrow">Mock AI adviser</span><h2>Navigator</h2><p>Answers from your profile and prototype data—not live AI yet.</p></div><span className="online-pill">{subscription.usage.adviserMessages}/{plan.limits.adviserMessages} used</span></div>
           <div className="suggestion-row">{['Which country fits my budget?', 'How should I prepare for IELTS?', 'Help me build a balanced shortlist', 'What funding should I prioritize?'].map((question) => <button onClick={() => send(question)} key={question}>{question}</button>)}</div>
           <div className="messages">
             {messages.map((message) => <div className={`message ${message.role}`} key={message.id}><div>{message.text}</div>{message.sources && <small>Based on: {message.sources.join(' · ')}</small>}</div>)}
@@ -752,6 +764,79 @@ function formatUsd(valueUsd: number, currencyCode: string) {
   return formatPreferredCurrency(valueUsd * 122, currencyCode)
 }
 
+function Subscription({ profile, subscription, setSubscription, savedCount, documentFolderCount, bookingCount }: {
+  profile: UserProfile
+  subscription: SubscriptionState
+  setSubscription: React.Dispatch<React.SetStateAction<SubscriptionState>>
+  savedCount: number
+  documentFolderCount: number
+  bookingCount: number
+}) {
+  const [billingCycle, setBillingCycle] = useState(subscription.billingCycle)
+  const [pendingPlan, setPendingPlan] = useState<SubscriptionPlan | null>(null)
+  const [toast, setToast] = useState('')
+  const currentPlan = plans.find((plan) => plan.id === subscription.planId) ?? plans[1]
+  const usageItems = [
+    { label: 'Adviser messages', used: subscription.usage.adviserMessages, limit: currentPlan.limits.adviserMessages },
+    { label: 'Programme comparisons', used: subscription.usage.comparisons, limit: currentPlan.limits.comparisons },
+    { label: 'Saved programmes', used: savedCount, limit: currentPlan.limits.shortlist },
+    { label: 'Document folders', used: documentFolderCount, limit: currentPlan.limits.documentFolders },
+    { label: 'Expert credits', used: Math.max(0, currentPlan.limits.expertCredits - subscription.usage.expertCredits), limit: currentPlan.limits.expertCredits },
+  ]
+  const applyPlan = () => {
+    if (!pendingPlan) return
+    setSubscription((current) => ({
+      ...current,
+      planId: pendingPlan.id,
+      billingCycle,
+      renewsAt: pendingPlan.id === 'free' ? 'No renewal' : billingCycle === 'annual' ? '18 June 2027' : '18 July 2026',
+      usage: { ...current.usage, expertCredits: pendingPlan.limits.expertCredits },
+    }))
+    setToast(`Plan changed to ${pendingPlan.name}.`)
+    setPendingPlan(null)
+  }
+
+  return (
+    <>
+      <Topbar title="Plans & usage" />
+      <div className="page-content">
+        {toast && <Toast message={toast} onClose={() => setToast('')} />}
+        <section className="subscription-hero">
+          <div><span className="eyebrow light">Current plan</span><h2>{currentPlan.name}</h2><p>{currentPlan.tagline}</p><div className="renewal-line">{subscription.renewsAt === 'No renewal' ? 'Free plan · no billing' : `Renews ${subscription.renewsAt} · ${subscription.billingCycle} billing`}</div></div>
+          <div className="plan-price"><strong>{currentPlan.monthlyUsd === 0 ? 'Free' : formatUsd(subscription.billingCycle === 'annual' ? currentPlan.annualUsd : currentPlan.monthlyUsd, profile.preferredCurrency)}</strong><span>{currentPlan.monthlyUsd === 0 ? 'forever' : subscription.billingCycle === 'annual' ? 'per year' : 'per month'}</span></div>
+        </section>
+
+        <section className="usage-panel panel">
+          <div className="section-title"><div><span className="eyebrow">This billing period</span><h2>Usage and entitlements</h2></div><span className="muted">{bookingCount} consultation booking(s)</span></div>
+          <div className="usage-grid">{usageItems.map((item) => {
+            const unlimited = item.limit >= 999
+            const percentage = unlimited ? Math.min(100, item.used * 5) : item.limit === 0 ? 100 : Math.min(100, item.used / item.limit * 100)
+            return <div className="usage-item" key={item.label}><div><span>{item.label}</span><strong>{unlimited ? `${item.used} / Unlimited` : `${item.used} / ${item.limit}`}</strong></div><div className={item.used >= item.limit && !unlimited ? 'limit-hit' : ''}><span style={{ width: `${percentage}%` }} /></div></div>
+          })}</div>
+        </section>
+
+        <div className="billing-toggle"><span>Billing</span><button className={billingCycle === 'monthly' ? 'active' : ''} onClick={() => setBillingCycle('monthly')}>Monthly</button><button className={billingCycle === 'annual' ? 'active' : ''} onClick={() => setBillingCycle('annual')}>Annual <em>Save ~17%</em></button></div>
+
+        <section className="plan-grid">{plans.map((plan) => {
+          const current = plan.id === subscription.planId
+          const price = billingCycle === 'annual' ? plan.annualUsd : plan.monthlyUsd
+          return <article className={`plan-card ${plan.recommended ? 'recommended' : ''} ${current ? 'current' : ''}`} key={plan.id}>
+            {plan.recommended && <span className="recommended-label">Recommended</span>}
+            <div className="plan-card-heading"><div><span className="eyebrow">{current ? 'Your plan' : plan.name}</span><h3>{plan.name}</h3></div>{current && <span className="current-check">✓</span>}</div>
+            <p>{plan.tagline}</p><div className="plan-card-price"><strong>{price === 0 ? 'Free' : formatUsd(price, profile.preferredCurrency)}</strong><span>{price === 0 ? 'No payment' : billingCycle === 'annual' ? '/ year' : '/ month'}</span></div>
+            <ul>{plan.features.map((feature) => <li key={feature}>✓ {feature}</li>)}</ul>
+            <div className="plan-limits"><span>{plan.limits.shortlist >= 999 ? 'Unlimited' : plan.limits.shortlist} saved programmes</span><span>{plan.limits.adviserMessages} adviser messages</span><span>{plan.limits.expertCredits} expert credit(s)</span></div>
+            <button className={current ? 'secondary wide' : 'primary wide'} disabled={current} onClick={() => setPendingPlan(plan)}>{current ? 'Current plan' : plan.monthlyUsd > currentPlan.monthlyUsd ? 'Upgrade plan' : 'Change plan'}</button>
+          </article>
+        })}</section>
+
+        <section className="billing-note"><span>i</span><div><strong>Prototype billing</strong><p>No payment method is collected. Plan changes only update local browser entitlements so you can test feature access and usage.</p></div></section>
+      </div>
+      {pendingPlan && <div className="modal-backdrop"><section className="plan-confirm-modal"><button className="modal-close" onClick={() => setPendingPlan(null)}>×</button><span className="eyebrow">Confirm plan change</span><h2>{currentPlan.name} → {pendingPlan.name}</h2><p>Your prototype entitlements will update immediately. No payment will be processed.</p><div className="confirmation-price"><small>{billingCycle} price</small><strong>{pendingPlan.monthlyUsd === 0 ? 'Free' : formatUsd(billingCycle === 'annual' ? pendingPlan.annualUsd : pendingPlan.monthlyUsd, profile.preferredCurrency)}</strong></div><div className="plan-confirm-actions"><button className="secondary" onClick={() => setPendingPlan(null)}>Cancel</button><button className="primary" onClick={applyPlan}>Confirm change</button></div></section></div>}
+    </>
+  )
+}
+
 function Roadmap({ documents }: { documents: UserDocument[] }) {
   const [items, setItems] = usePersistentState<RoadmapItem[]>('navigator-roadmap', initialRoadmap)
   const effectiveItems = items.map((item) => {
@@ -918,6 +1003,12 @@ function App() {
   const [documents, setDocuments] = usePersistentState<UserDocument[]>('navigator-documents', defaultDocuments)
   const [applications, setApplications] = usePersistentState<ApplicationRecord[]>('navigator-applications', [])
   const [bookings, setBookings] = usePersistentState<ConsultationBooking[]>('navigator-consultations', [])
+  const [subscription, setSubscription] = usePersistentState<SubscriptionState>('navigator-subscription', {
+    planId: 'essential',
+    billingCycle: 'monthly',
+    renewsAt: '18 July 2026',
+    usage: { adviserMessages: 4, comparisons: 1, expertCredits: 0 },
+  })
   const [appToast, setAppToast] = useState('')
   const normalizedDocuments = useMemo(() => normalizeDocuments(documents), [documents])
   useEffect(() => {
@@ -927,21 +1018,35 @@ function App() {
   const strongestProgram = useMemo(() => [...programs].sort((a, b) => scores[b.id].overall - scores[a.id].overall)[0], [scores])
   const notifications = useMemo(() => buildNotifications(profile, strongestProgram, normalizedDocuments), [profile, strongestProgram, normalizedDocuments])
   const missingDocuments = normalizedDocuments.filter((item) => item.required && item.status === 'missing').length
+  const currentPlan = plans.find((plan) => plan.id === subscription.planId) ?? plans[1]
 
   if (!authenticated) return <AuthScreen onAuthenticated={(isNew) => { setAuthenticated(true); if (isNew) setOnboarded(false) }} />
   if (!onboarded) return <Onboarding profile={profile} onComplete={(updatedProfile) => { setProfile(updatedProfile); localStorage.setItem('navigator-onboarded', 'true'); setOnboarded(true) }} />
 
   const openProgram = (program: Program) => { setSelectedProgram(program); setView('program') }
   const logout = () => { localStorage.removeItem('navigator-session'); setAuthenticated(false) }
-  const toggleSaved = (id: string) => setSavedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
+  const toggleSaved = (id: string) => setSavedIds((current) => {
+    if (current.includes(id)) return current.filter((item) => item !== id)
+    if (current.length >= currentPlan.limits.shortlist) {
+      setView('subscription')
+      setAppToast(`Your ${currentPlan.name} plan shortlist limit has been reached.`)
+      return current
+    }
+    return [...current, id]
+  })
   const toggleCompare = (id: string) => setCompareIds((current) => {
     if (current.includes(id)) return current.filter((item) => item !== id)
-    if (current.length >= 3) return [...current.slice(1), id]
+    if (current.length >= currentPlan.limits.comparisons) {
+      setView('subscription')
+      setAppToast(`Your ${currentPlan.name} plan comparison limit has been reached.`)
+      return current
+    }
+    setSubscription((state) => ({ ...state, usage: { ...state.usage, comparisons: state.usage.comparisons + 1 } }))
     return [...current, id]
   })
   const resetDemo = () => {
     if (!window.confirm('Reset all prototype profile, document, shortlist, roadmap and adviser data?')) return
-    ;['navigator-profile', 'navigator-documents', 'navigator-shortlist', 'navigator-comparison', 'navigator-roadmap', 'navigator-chat', 'navigator-applications', 'navigator-later-study-tasks', 'navigator-consultations'].forEach((key) => localStorage.removeItem(key))
+    ;['navigator-profile', 'navigator-documents', 'navigator-shortlist', 'navigator-comparison', 'navigator-roadmap', 'navigator-chat', 'navigator-applications', 'navigator-later-study-tasks', 'navigator-consultations', 'navigator-subscription'].forEach((key) => localStorage.removeItem(key))
     window.location.reload()
   }
 
@@ -950,16 +1055,17 @@ function App() {
       <Sidebar view={view} setView={setView} onLogout={logout} documentCount={missingDocuments} />
       <main className="workspace">
         {appToast && <Toast message={appToast} onClose={() => setAppToast('')} />}
-        {view === 'dashboard' && <Dashboard setView={setView} openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} profile={profile} scores={scores} notifications={notifications} />}
+        {view === 'dashboard' && <Dashboard setView={setView} openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} profile={profile} scores={scores} notifications={notifications} plan={currentPlan} />}
         {view === 'study-plan' && <StudyPlan profile={profile} documents={normalizedDocuments} savedIds={savedIds} scores={scores} applications={applications} setApplications={setApplications} setView={setView} openProgram={openProgram} />}
-        {view === 'explore' && <Explore openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} openCompare={() => setView('shortlist')} scores={scores} profile={profile} />}
+        {view === 'explore' && <Explore openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} openCompare={() => setView('shortlist')} scores={scores} profile={profile} plan={currentPlan} />}
         {view === 'program' && <ProgramDetail program={selectedProgram} score={scores[selectedProgram.id]} profile={profile} goBack={() => setView('explore')} goRoadmap={() => setView('roadmap')} saved={savedIds.includes(selectedProgram.id)} toggleSaved={() => toggleSaved(selectedProgram.id)} />}
-        {view === 'shortlist' && <Shortlist savedIds={savedIds} compareIds={compareIds} openProgram={openProgram} toggleSaved={toggleSaved} toggleCompare={toggleCompare} scores={scores} profile={profile} />}
+        {view === 'shortlist' && <Shortlist savedIds={savedIds} compareIds={compareIds} openProgram={openProgram} toggleSaved={toggleSaved} toggleCompare={toggleCompare} scores={scores} profile={profile} plan={currentPlan} />}
         {view === 'scholarships' && <Scholarships openProgram={openProgram} />}
         {view === 'roadmap' && <Roadmap documents={normalizedDocuments} />}
         {view === 'documents' && <Documents documents={normalizedDocuments} onChange={setDocuments} onProfileUpdate={(update) => { setProfile((current) => ({ ...current, ...update })); setAppToast('Profile readiness updated from document status.') }} setView={setView} />}
-        {view === 'adviser' && <Adviser />}
+        {view === 'adviser' && <Adviser plan={currentPlan} subscription={subscription} setSubscription={setSubscription} openPlans={() => setView('subscription')} />}
         {view === 'experts' && <Experts profile={profile} documents={normalizedDocuments} bookings={bookings} setBookings={setBookings} />}
+        {view === 'subscription' && <Subscription profile={profile} subscription={subscription} setSubscription={setSubscription} savedCount={savedIds.length} documentFolderCount={normalizedDocuments.length} bookingCount={bookings.length} />}
         {view === 'profile' && <><Profile profile={profile} onSave={(updated) => { setProfile(updated); setAppToast('Profile saved. Guidance has been recalculated.') }} /><div className="reset-demo-wrap"><button className="reset-demo" onClick={resetDemo}>Reset all demo data</button></div></>}
       </main>
       <nav className="mobile-nav">
