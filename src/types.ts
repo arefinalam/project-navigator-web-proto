@@ -8,6 +8,7 @@ export type View =
   | 'adviser'
   | 'documents'
   | 'study-plan'
+  | 'career-plan'
   | 'experts'
   | 'subscription'
   | 'profile'
@@ -163,6 +164,30 @@ export type StudyPhase = {
   description: string
   icon: string
   target: string
+}
+
+export type CareerRole = {
+  id: string
+  title: string
+  family: string
+  summary: string
+  demand: 'Growing' | 'Strong' | 'Stable'
+  salaryUsd: string
+  workStyles: string[]
+  coreSkills: string[]
+  relatedBackgrounds: string[]
+  accent: string
+}
+
+export type CareerProfile = {
+  experienceLevel: 'student' | 'entry' | 'mid' | 'senior'
+  careerGoal: 'first-role' | 'career-change' | 'promotion' | 'exploration'
+  targetTimeline: '3-months' | '6-months' | '12-months' | 'exploring'
+  workStyle: string[]
+  interests: string[]
+  currentSkills: string[]
+  targetRoleIds: string[]
+  completedTasks: string[]
 }
 
 export type ApplicationStatus =

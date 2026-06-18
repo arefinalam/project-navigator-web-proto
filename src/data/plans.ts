@@ -2,6 +2,7 @@ import type { SubscriptionPlan } from '../types'
 
 export type GatedFeature =
   | 'studyPlan'
+  | 'careerPlan'
   | 'shortlist'
   | 'scholarships'
   | 'roadmap'
@@ -14,6 +15,7 @@ export type GatedFeature =
 
 export const featureMinimumPlan: Record<GatedFeature, SubscriptionPlan['id']> = {
   studyPlan: 'essential',
+  careerPlan: 'essential',
   shortlist: 'essential',
   scholarships: 'essential',
   roadmap: 'essential',

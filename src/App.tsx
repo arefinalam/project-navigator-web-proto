@@ -8,9 +8,10 @@ import { countries, countryPreferenceDefaults, currencies, subjects, timezones, 
 import { defaultDocuments } from './data/documents'
 import { studyPhases } from './data/studyPlan'
 import { experts } from './data/experts'
+import { careerRoles, careerTasks, defaultCareerProfile } from './data/careers'
 import { canUseFeature, minimumPlanName, plans, type GatedFeature } from './data/plans'
 import { bdtToPreferred, buildNotifications, defaultProfile, estimateCost, formatPreferredCurrency, formatProfileCurrency, formatProfileDate, preferredToBdt, scoreProgram } from './lib/personalization'
-import type { ApplicationRecord, ApplicationStatus, AppNotification, ChatMessage, ConsultationBooking, DocumentFile, Expert, Program, ProgramScore, RoadmapItem, Scholarship, StudyPhaseId, SubscriptionPlan, SubscriptionState, UserDocument, UserProfile, View } from './types'
+import type { ApplicationRecord, ApplicationStatus, AppNotification, CareerProfile, CareerRole, ChatMessage, ConsultationBooking, DocumentFile, Expert, Program, ProgramScore, RoadmapItem, Scholarship, StudyPhaseId, SubscriptionPlan, SubscriptionState, UserDocument, UserProfile, View } from './types'
 import './App.css'
 
 type AuthMode = 'login' | 'signup'
@@ -205,6 +206,7 @@ function Sidebar({ view, setView, onLogout, documentCount, planId, onLocked }: {
   const links: { id: View, label: string, icon: string, feature?: GatedFeature }[] = [
     { id: 'dashboard', label: 'Overview', icon: '⌂' },
     { id: 'study-plan', label: 'Study plan', icon: '◎', feature: 'studyPlan' },
+    { id: 'career-plan', label: 'Career plan', icon: '↗', feature: 'careerPlan' },
     { id: 'explore', label: 'Explore programs', icon: '⌕' },
     { id: 'shortlist', label: 'Shortlist & compare', icon: '◇', feature: 'shortlist' },
     { id: 'scholarships', label: 'Scholarships', icon: '$', feature: 'scholarships' },
@@ -511,6 +513,7 @@ function EmptyState({ title, text }: { title: string, text: string }) {
 
 const gatedFeatureLabels: Record<GatedFeature, string> = {
   studyPlan: 'Full study plan',
+  careerPlan: 'Career planning workspace',
   shortlist: 'Shortlist and comparison',
   scholarships: 'Scholarship matching',
   roadmap: 'Personal roadmap',
@@ -692,6 +695,124 @@ function StudyPlan({ profile, documents, savedIds, scores, applications, setAppl
 
 function LaterStageChecklist({ title, locked, tasks, values, onToggle }: { title: string, locked: boolean, tasks: string[][], values: Record<string, boolean>, onToggle: (id: string) => void }) {
   return <section className={`panel later-checklist ${locked ? 'locked' : ''}`}><div className="section-title"><h2>{title}</h2>{locked && <span className="locked-pill">Unlocks after offer</span>}</div>{tasks.map(([id, label]) => <label key={id}><input type="checkbox" disabled={locked} checked={Boolean(values[id])} onChange={() => onToggle(id)} /><span>{label}</span></label>)}</section>
+}
+
+function scoreCareerRole(role: CareerRole, career: CareerProfile, profile: UserProfile) {
+  const skillMatches = role.coreSkills.filter((skill) => career.currentSkills.some((current) => current.toLowerCase() === skill.toLowerCase())).length
+  const styleMatches = role.workStyles.filter((style) => career.workStyle.includes(style)).length
+  const backgroundMatch = role.relatedBackgrounds.some((background) => `${profile.currentDegree} ${profile.subject}`.toLowerCase().includes(background.toLowerCase()))
+  const score = Math.min(96, 48 + skillMatches * 9 + styleMatches * 6 + (backgroundMatch ? 10 : 0))
+  return {
+    score,
+    matchedSkills: role.coreSkills.filter((skill) => career.currentSkills.some((current) => current.toLowerCase() === skill.toLowerCase())),
+    gaps: role.coreSkills.filter((skill) => !career.currentSkills.some((current) => current.toLowerCase() === skill.toLowerCase())),
+  }
+}
+
+function CareerPlan({ profile, career, setCareer, openExperts }: {
+  profile: UserProfile
+  career: CareerProfile
+  setCareer: React.Dispatch<React.SetStateAction<CareerProfile>>
+  openExperts: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(career)
+  const [family, setFamily] = useState('All paths')
+  const [toast, setToast] = useState('')
+  const roleScores = useMemo(() => Object.fromEntries(careerRoles.map((role) => [role.id, scoreCareerRole(role, career, profile)])), [career, profile])
+  const rankedRoles = [...careerRoles].sort((a, b) => roleScores[b.id].score - roleScores[a.id].score)
+  const filteredRoles = rankedRoles.filter((role) => family === 'All paths' || role.family === family)
+  const targetRoles = rankedRoles.filter((role) => career.targetRoleIds.includes(role.id))
+  const primaryRole = targetRoles[0] ?? rankedRoles[0]
+  const primaryScore = roleScores[primaryRole.id]
+  const completed = career.completedTasks.length
+  const overall = Math.round((Math.min(career.targetRoleIds.length, 3) / 3 * 30) + (Math.min(career.currentSkills.length, 6) / 6 * 25) + (completed / careerTasks.length * 45))
+
+  const toggleListValue = (field: 'workStyle' | 'interests' | 'currentSkills', value: string) => {
+    setDraft((current) => ({
+      ...current,
+      [field]: current[field].includes(value) ? current[field].filter((item) => item !== value) : [...current[field], value],
+    }))
+  }
+  const toggleTarget = (id: string) => setCareer((current) => ({
+    ...current,
+    targetRoleIds: current.targetRoleIds.includes(id)
+      ? current.targetRoleIds.filter((item) => item !== id)
+      : current.targetRoleIds.length >= 3 ? current.targetRoleIds : [...current.targetRoleIds, id],
+  }))
+  const toggleTask = (id: string) => setCareer((current) => ({
+    ...current,
+    completedTasks: current.completedTasks.includes(id)
+      ? current.completedTasks.filter((item) => item !== id)
+      : [...current.completedTasks, id],
+  }))
+
+  return <>
+    <Topbar title="Career plan" />
+    <div className="page-content">
+      {toast && <Toast message={toast} onClose={() => setToast('')} />}
+      <section className="career-hero">
+        <div><span className="eyebrow light">{profile.currentDegree} · {career.experienceLevel} level</span><h2>Turn career uncertainty into testable direction.</h2><p>Compare roles, expose skill gaps, build evidence and review your progress in one workspace.</p></div>
+        <div className="career-progress"><strong>{overall}%</strong><span>career plan ready</span></div>
+      </section>
+
+      <div className="career-summary-grid">
+        <article><span>◎</span><div><small>Primary direction</small><strong>{primaryRole.title}</strong></div></article>
+        <article><span>↗</span><div><small>Current role fit</small><strong>{primaryScore.score}%</strong></div></article>
+        <article><span>✓</span><div><small>Roadmap progress</small><strong>{completed}/{careerTasks.length} tasks</strong></div></article>
+        <article><span>⌁</span><div><small>Priority gaps</small><strong>{primaryScore.gaps.slice(0, 2).join(', ') || 'Evidence building'}</strong></div></article>
+      </div>
+
+      <section className="panel career-profile-panel">
+        <div className="section-title"><div><span className="eyebrow">Career baseline</span><h2>Your direction inputs</h2></div><button className="secondary" onClick={() => { setDraft(career); setEditing((value) => !value) }}>{editing ? 'Cancel' : 'Edit baseline'}</button></div>
+        {editing ? <div className="career-editor">
+          <div className="field-grid">
+            <label>Experience level<select value={draft.experienceLevel} onChange={(event) => setDraft({ ...draft, experienceLevel: event.target.value as CareerProfile['experienceLevel'] })}><option value="student">Student</option><option value="entry">Entry level</option><option value="mid">Mid-career</option><option value="senior">Senior</option></select></label>
+            <label>Career objective<select value={draft.careerGoal} onChange={(event) => setDraft({ ...draft, careerGoal: event.target.value as CareerProfile['careerGoal'] })}><option value="first-role">Find my first role</option><option value="career-change">Change career direction</option><option value="promotion">Prepare for progression</option><option value="exploration">Explore possibilities</option></select></label>
+            <label>Target timeline<select value={draft.targetTimeline} onChange={(event) => setDraft({ ...draft, targetTimeline: event.target.value as CareerProfile['targetTimeline'] })}><option value="3-months">Within 3 months</option><option value="6-months">Within 6 months</option><option value="12-months">Within 12 months</option><option value="exploring">Still exploring</option></select></label>
+          </div>
+          <CareerChoiceGroup title="Preferred work style" options={['Analytical work', 'Deep technical work', 'Cross-team collaboration', 'Client-facing work', 'Human-centered work', 'Continuous learning', 'Technology products', 'Research', 'Problem solving']} values={draft.workStyle} onToggle={(value) => toggleListValue('workStyle', value)} />
+          <CareerChoiceGroup title="Interests" options={['Data and insights', 'Technology products', 'Business strategy', 'AI systems', 'People and behavior', 'Design and research']} values={draft.interests} onToggle={(value) => toggleListValue('interests', value)} />
+          <CareerChoiceGroup title="Current skills" options={['Python', 'SQL', 'Excel', 'Statistics', 'Data visualization', 'Machine learning', 'Software engineering', 'Presentation', 'Stakeholder communication', 'Research design']} values={draft.currentSkills} onToggle={(value) => toggleListValue('currentSkills', value)} />
+          <div className="profile-save"><button className="primary" onClick={() => { setCareer(draft); setEditing(false); setToast('Career baseline saved and role matches recalculated.') }}>Save career baseline →</button></div>
+        </div> : <div className="career-baseline">
+          <div><small>Objective</small><strong>{career.careerGoal.replaceAll('-', ' ')}</strong></div><div><small>Timeline</small><strong>{career.targetTimeline.replaceAll('-', ' ')}</strong></div><div><small>Work preferences</small><strong>{career.workStyle.join(', ')}</strong></div><div><small>Current skills</small><strong>{career.currentSkills.join(', ')}</strong></div>
+        </div>}
+      </section>
+
+      <section className="career-role-section">
+        <div className="section-title"><div><span className="eyebrow">Role explorer</span><h2>Career paths ranked around your profile</h2></div><div className="career-family-filter">{['All paths', ...new Set(careerRoles.map((role) => role.family))].map((item) => <button className={family === item ? 'active' : ''} onClick={() => setFamily(item)} key={item}>{item}</button>)}</div></div>
+        <div className="career-role-grid">{filteredRoles.map((role) => {
+          const result = roleScores[role.id]
+          const selected = career.targetRoleIds.includes(role.id)
+          return <article className={`career-role-card ${selected ? 'selected' : ''}`} key={role.id}>
+            <div className="career-role-head"><span style={{ background: role.accent }}>{role.title.split(' ').map((word) => word[0]).join('')}</span><div><small>{role.family}</small><h3>{role.title}</h3></div><strong>{result.score}%</strong></div>
+            <p>{role.summary}</p>
+            <div className="career-role-facts"><span>{role.demand} demand</span><span>{role.salaryUsd}</span></div>
+            <div className="career-skill-tags">{result.matchedSkills.map((skill) => <span className="matched" key={skill}>✓ {skill}</span>)}{result.gaps.slice(0, 3).map((skill) => <span key={skill}>+ {skill}</span>)}</div>
+            <button className={selected ? 'secondary wide' : 'primary wide'} disabled={!selected && career.targetRoleIds.length >= 3} onClick={() => toggleTarget(role.id)}>{selected ? 'Remove target' : career.targetRoleIds.length >= 3 ? 'Three-role limit reached' : 'Add as target role'}</button>
+          </article>
+        })}</div>
+      </section>
+
+      <div className="career-workspace-grid">
+        <main>
+          <section className="panel career-roadmap">
+            <div className="section-title"><div><span className="eyebrow">Action roadmap</span><h2>Build direction through evidence</h2></div><span className="verified">{completed}/{careerTasks.length} complete</span></div>
+            {careerTasks.map((task) => <label className={career.completedTasks.includes(task.id) ? 'complete' : ''} key={task.id}><input type="checkbox" checked={career.completedTasks.includes(task.id)} onChange={() => toggleTask(task.id)} /><span>{task.phase}</span><div><strong>{task.title}</strong><small>{task.detail}</small></div></label>)}
+          </section>
+        </main>
+        <aside>
+          <section className="panel skill-gap-panel"><span className="eyebrow">Primary role gap</span><h2>{primaryRole.title}</h2><p>{primaryScore.score}% current fit based on your selected skills, work style and background.</p>{primaryRole.coreSkills.map((skill) => <div key={skill}><span>{skill}</span><strong>{primaryScore.matchedSkills.includes(skill) ? 'Ready' : 'Develop'}</strong></div>)}</section>
+          <section className="career-expert-card"><span>◎</span><h3>Validate this direction</h3><p>Use an expert session to challenge your assumptions, review evidence and prioritize the next skill cycle.</p><button onClick={openExperts}>Find a career expert →</button></section>
+        </aside>
+      </div>
+    </div>
+  </>
+}
+
+function CareerChoiceGroup({ title, options, values, onToggle }: { title: string, options: string[], values: string[], onToggle: (value: string) => void }) {
+  return <div className="career-choice-group"><strong>{title}</strong><div>{options.map((option) => <button className={values.includes(option) ? 'selected' : ''} onClick={() => onToggle(option)} key={option}>{values.includes(option) ? '✓ ' : '+ '}{option}</button>)}</div></div>
 }
 
 function Experts({ profile, documents, bookings, setBookings, plan, subscription, setSubscription }: {
@@ -1088,6 +1209,7 @@ function App() {
   const [profile, setProfile] = usePersistentState<UserProfile>('navigator-profile', defaultProfile)
   const [documents, setDocuments] = usePersistentState<UserDocument[]>('navigator-documents', defaultDocuments)
   const [applications, setApplications] = usePersistentState<ApplicationRecord[]>('navigator-applications', [])
+  const [careerProfile, setCareerProfile] = usePersistentState<CareerProfile>('navigator-career-profile', defaultCareerProfile)
   const [bookings, setBookings] = usePersistentState<ConsultationBooking[]>('navigator-consultations', [])
   const [subscription, setSubscription] = usePersistentState<SubscriptionState>('navigator-subscription', {
     planId: 'essential',
@@ -1140,7 +1262,7 @@ function App() {
   })
   const resetDemo = () => {
     if (!window.confirm('Reset all prototype profile, document, shortlist, roadmap and adviser data?')) return
-    ;['navigator-profile', 'navigator-documents', 'navigator-shortlist', 'navigator-comparison', 'navigator-roadmap', 'navigator-chat', 'navigator-applications', 'navigator-later-study-tasks', 'navigator-consultations', 'navigator-subscription'].forEach((key) => localStorage.removeItem(key))
+    ;['navigator-profile', 'navigator-documents', 'navigator-shortlist', 'navigator-comparison', 'navigator-roadmap', 'navigator-chat', 'navigator-applications', 'navigator-career-profile', 'navigator-later-study-tasks', 'navigator-consultations', 'navigator-subscription'].forEach((key) => localStorage.removeItem(key))
     window.location.reload()
   }
 
@@ -1152,6 +1274,7 @@ function App() {
         {appToast && <Toast message={appToast} onClose={() => setAppToast('')} />}
         {view === 'dashboard' && <Dashboard setView={setView} openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} profile={profile} scores={scores} notifications={notifications} plan={currentPlan} />}
         {view === 'study-plan' && <StudyPlan profile={profile} documents={normalizedDocuments} savedIds={savedIds} scores={scores} applications={applications} setApplications={setApplications} setView={setView} openProgram={openProgram} />}
+        {view === 'career-plan' && <CareerPlan profile={profile} career={careerProfile} setCareer={setCareerProfile} openExperts={() => setView('experts')} />}
         {view === 'explore' && <Explore openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} openCompare={() => setView('shortlist')} scores={scores} profile={profile} plan={currentPlan} />}
         {view === 'program' && <ProgramDetail program={selectedProgram} score={scores[selectedProgram.id]} profile={profile} goBack={() => setView('explore')} goRoadmap={() => canUseFeature(currentPlan.id, 'roadmap') ? setView('roadmap') : requestUpgrade('roadmap')} saved={savedIds.includes(selectedProgram.id)} toggleSaved={() => toggleSaved(selectedProgram.id)} advancedCosts={canUseFeature(currentPlan.id, 'advancedCosts')} onUpgrade={() => requestUpgrade('advancedCosts')} />}
         {view === 'shortlist' && <Shortlist savedIds={savedIds} compareIds={compareIds} openProgram={openProgram} toggleSaved={toggleSaved} toggleCompare={toggleCompare} scores={scores} profile={profile} plan={currentPlan} />}
@@ -1166,10 +1289,10 @@ function App() {
       <nav className="mobile-nav">
         {([
           ['dashboard', '⌂', 'Home'],
-          ['study-plan', '◎', 'Plan', 'studyPlan'],
+          ['study-plan', '◎', 'Study', 'studyPlan'],
+          ['career-plan', '↗', 'Career', 'careerPlan'],
           ['explore', '⌕', 'Explore'],
           ['shortlist', '◇', 'Saved', 'shortlist'],
-          ['documents', '▤', 'Docs', 'documents'],
         ] as [View, string, string, GatedFeature?][]).map(([id, icon, label, feature]) => {
           const locked = Boolean(feature && !canUseFeature(currentPlan.id, feature))
           return <button className={`${view === id || (view === 'program' && id === 'explore') ? 'active' : ''} ${locked ? 'locked' : ''}`} onClick={() => locked && feature ? requestUpgrade(feature) : setView(id)} key={id}><span>{icon}</span>{label}{locked && <em>⌁</em>}</button>
@@ -1181,6 +1304,7 @@ function App() {
         ['roadmap', '✓', 'My roadmap', 'roadmap'],
         ['adviser', '✦', 'Ask Navigator', 'adviser'],
         ['experts', '◉', 'Expert consultations', 'expertBooking'],
+        ['documents', '▤', 'Documents', 'documents'],
         ['subscription', '◆', 'Plans & usage'],
         ['profile', '○', 'My profile'],
       ] as [View, string, string, GatedFeature?][]).map(([id, icon, label, feature]) => {
