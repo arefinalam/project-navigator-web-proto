@@ -3,7 +3,9 @@ import programsData from './data/programs.json'
 import roadmapData from './data/roadmap.json'
 import scholarshipsData from './data/scholarships.json'
 import { usePersistentState } from './hooks/usePersistentState'
-import { buildNotifications, defaultProfile, estimateCost, lakh, scoreProgram } from './lib/personalization'
+import { Autocomplete, MultiAutocomplete } from './components/Autocomplete'
+import { countries, currencies, subjects, universities } from './data/referenceData'
+import { bdtToPreferred, buildNotifications, defaultProfile, estimateCost, formatPreferredCurrency, preferredToBdt, scoreProgram } from './lib/personalization'
 import type { AppNotification, ChatMessage, Program, ProgramScore, RoadmapItem, Scholarship, UserProfile, View } from './types'
 import './App.css'
 
@@ -12,8 +14,6 @@ type AuthMode = 'login' | 'signup'
 const programs = programsData as Program[]
 const initialRoadmap = roadmapData as RoadmapItem[]
 const scholarships = scholarshipsData as Scholarship[]
-
-const money = new Intl.NumberFormat('en-US')
 
 function Logo() {
   return (
@@ -126,7 +126,7 @@ function Onboarding({ profile, onComplete }: { profile: UserProfile, onComplete:
             <h1>What do you want to study?</h1>
             <div className="field-grid">
               <label>Target degree<select value={draft.targetDegree} onChange={(e) => setDraft({ ...draft, targetDegree: e.target.value })}><option>Master’s</option><option>Bachelor’s</option><option>PhD</option></select></label>
-              <label>Subject area<select value={draft.subject} onChange={(e) => setDraft({ ...draft, subject: e.target.value })}><option>Data Science & AI</option><option>Business & Management</option><option>Engineering</option><option>Public Health</option></select></label>
+              <Autocomplete label="Subject area" value={draft.subject} options={subjects} onChange={(subject) => setDraft({ ...draft, subject })} placeholder="Start typing a subject" />
               <label>Current CGPA<input type="number" min="0" max="4" step=".01" value={draft.cgpa} onChange={(e) => setDraft({ ...draft, cgpa: Number(e.target.value) })} /></label>
               <label>Graduation year<input type="number" value={draft.graduationYear} onChange={(e) => setDraft({ ...draft, graduationYear: Number(e.target.value) })} /></label>
             </div>
@@ -136,8 +136,9 @@ function Onboarding({ profile, onComplete }: { profile: UserProfile, onComplete:
             <h1>Tell us what matters to you</h1>
             <div className="field-grid">
               <label>Preferred intake<select value={draft.preferredIntake} onChange={(e) => setDraft({ ...draft, preferredIntake: e.target.value })}><option>Fall 2027</option><option>Spring 2027</option><option>Fall 2028</option></select></label>
-              <label>Annual budget<select value={draft.annualBudgetBdt} onChange={(e) => setDraft({ ...draft, annualBudgetBdt: Number(e.target.value) })}><option value="1500000">Under BDT 15 lakh</option><option value="2500000">BDT 15–25 lakh</option><option value="4000000">BDT 25–40 lakh</option></select></label>
-              <label>Preferred destinations<input value={draft.preferredCountries.join(', ')} onChange={(e) => setDraft({ ...draft, preferredCountries: e.target.value.split(',').map((item) => item.trim()).filter(Boolean) })} /></label>
+              <label>Preferred currency<select value={draft.preferredCurrency} onChange={(e) => setDraft({ ...draft, preferredCurrency: e.target.value })}>{currencies.map((currency) => <option value={currency.code} key={currency.code}>{currency.code} — {currency.label}</option>)}</select></label>
+              <label>Annual budget ({draft.preferredCurrency})<input type="number" step="1000" value={bdtToPreferred(draft.annualBudgetBdt, draft.preferredCurrency)} onChange={(e) => setDraft({ ...draft, annualBudgetBdt: preferredToBdt(Number(e.target.value), draft.preferredCurrency) })} /></label>
+              <MultiAutocomplete label="Preferred destinations" values={draft.preferredCountries} options={countries} onChange={(preferredCountries) => setDraft({ ...draft, preferredCountries })} />
               <label>English test<select value={draft.ieltsStatus} onChange={(e) => setDraft({ ...draft, ieltsStatus: e.target.value as UserProfile['ieltsStatus'] })}><option value="planning">Planning IELTS</option><option value="completed">IELTS completed</option><option value="not-planned">Not planned</option></select></label>
             </div>
           </>}
@@ -183,9 +184,10 @@ function Topbar({ title, notifications = [], onNotification }: { title: string, 
   return <header className="topbar"><div><span className="mobile-logo"><Logo /></span><h1>{title}</h1></div><div className="top-actions"><button aria-label="Notifications" onClick={() => setOpen((value) => !value)}>♢{notifications.length > 0 && <span className="notification-dot" />}</button><div className="avatar">SR</div>{open && <div className="notification-menu"><div className="notification-title"><strong>Notifications</strong><span>{notifications.length} new</span></div>{notifications.map((item) => <button className="notification-item" key={item.id} onClick={() => { onNotification?.(item); setOpen(false) }}><span className={`notice-icon ${item.type}`}>{item.type === 'funding' ? '$' : item.type === 'deadline' ? '!' : item.type === 'profile' ? '○' : '✦'}</span><div><strong>{item.title}</strong><small>{item.detail}</small></div></button>)}</div>}</div></header>
 }
 
-function ProgramCard({ program, score, onOpen, saved, compared, onSave, onCompare }: {
+function ProgramCard({ program, score, profile, onOpen, saved, compared, onSave, onCompare }: {
   program: Program
   score: ProgramScore
+  profile: UserProfile
   onOpen: () => void
   saved: boolean
   compared: boolean
@@ -206,7 +208,7 @@ function ProgramCard({ program, score, onOpen, saved, compared, onSave, onCompar
       <p>{program.university}</p>
       <div className="tag-row"><span>{program.degree}</span><span>{program.duration}</span><span>{program.intake}</span></div>
       <div className="program-meta">
-        <div><small>Annual tuition</small><strong>{program.currency} {money.format(program.tuition)}</strong></div>
+        <div><small>Annual tuition</small><strong>{formatPreferredCurrency(estimateCost(program, profile).tuitionBdt, profile.preferredCurrency)}</strong></div>
         <div><small>Deadline</small><strong>{program.deadline}</strong></div>
       </div>
       <div className="score-mini"><span>Academic {score.academic}%</span><span>Budget {score.budget}%</span></div>
@@ -262,14 +264,14 @@ function Dashboard({ setView, openProgram, savedIds, compareIds, toggleSaved, to
 
         <section className="recommend-section">
           <div className="section-title"><div><span className="eyebrow">Recommended for you</span><h2>Your strongest program matches</h2></div><button className="text-button" onClick={() => setView('explore')}>Explore all programs →</button></div>
-          <div className="program-grid">{topPrograms.map((program) => <ProgramCard key={program.id} program={program} score={scores[program.id]} onOpen={() => openProgram(program)} saved={savedIds.includes(program.id)} compared={compareIds.includes(program.id)} onSave={() => toggleSaved(program.id)} onCompare={() => toggleCompare(program.id)} />)}</div>
+          <div className="program-grid">{topPrograms.map((program) => <ProgramCard key={program.id} program={program} score={scores[program.id]} profile={profile} onOpen={() => openProgram(program)} saved={savedIds.includes(program.id)} compared={compareIds.includes(program.id)} onSave={() => toggleSaved(program.id)} onCompare={() => toggleCompare(program.id)} />)}</div>
         </section>
       </div>
     </>
   )
 }
 
-function Explore({ openProgram, savedIds, compareIds, toggleSaved, toggleCompare, openCompare, scores }: {
+function Explore({ openProgram, savedIds, compareIds, toggleSaved, toggleCompare, openCompare, scores, profile }: {
   openProgram: (program: Program) => void
   savedIds: string[]
   compareIds: string[]
@@ -277,6 +279,7 @@ function Explore({ openProgram, savedIds, compareIds, toggleSaved, toggleCompare
   toggleCompare: (id: string) => void
   openCompare: () => void
   scores: Record<string, ProgramScore>
+  profile: UserProfile
 }) {
   const [country, setCountry] = useState('All countries')
   const [query, setQuery] = useState('')
@@ -296,19 +299,20 @@ function Explore({ openProgram, savedIds, compareIds, toggleSaved, toggleCompare
           <span>{filtered.length} programs · {compareIds.length}/3 selected</span>
         </div>
         {compareIds.length >= 2 && <div className="compare-banner"><span><strong>{compareIds.length} programs selected.</strong> See their cost, match and funding side by side.</span><button onClick={openCompare}>Compare now →</button></div>}
-        <div className="program-grid wide-grid">{filtered.map((program) => <ProgramCard key={program.id} program={program} score={scores[program.id]} onOpen={() => openProgram(program)} saved={savedIds.includes(program.id)} compared={compareIds.includes(program.id)} onSave={() => toggleSaved(program.id)} onCompare={() => toggleCompare(program.id)} />)}</div>
+        <div className="program-grid wide-grid">{filtered.map((program) => <ProgramCard key={program.id} program={program} score={scores[program.id]} profile={profile} onOpen={() => openProgram(program)} saved={savedIds.includes(program.id)} compared={compareIds.includes(program.id)} onSave={() => toggleSaved(program.id)} onCompare={() => toggleCompare(program.id)} />)}</div>
       </div>
     </>
   )
 }
 
-function Shortlist({ savedIds, compareIds, openProgram, toggleSaved, toggleCompare, scores }: {
+function Shortlist({ savedIds, compareIds, openProgram, toggleSaved, toggleCompare, scores, profile }: {
   savedIds: string[]
   compareIds: string[]
   openProgram: (program: Program) => void
   toggleSaved: (id: string) => void
   toggleCompare: (id: string) => void
   scores: Record<string, ProgramScore>
+  profile: UserProfile
 }) {
   const savedPrograms = programs.filter((program) => savedIds.includes(program.id))
   const comparedPrograms = programs.filter((program) => compareIds.includes(program.id))
@@ -333,7 +337,7 @@ function Shortlist({ savedIds, compareIds, openProgram, toggleSaved, toggleCompa
                   <tr><td>Match</td>{comparedPrograms.map((program) => <td key={program.id}><span className="score-chip">{scores[program.id].overall}%</span></td>)}</tr>
                   <tr><td>Academic</td>{comparedPrograms.map((program) => <td key={program.id}>{scores[program.id].academic}%</td>)}</tr>
                   <tr><td>Budget fit</td>{comparedPrograms.map((program) => <td key={program.id}>{scores[program.id].budget}%</td>)}</tr>
-                  <tr><td>Tuition</td>{comparedPrograms.map((program) => <td key={program.id}>{program.currency} {money.format(program.tuition)}</td>)}</tr>
+                  <tr><td>Tuition</td>{comparedPrograms.map((program) => <td key={program.id}>{formatPreferredCurrency(estimateCost(program, profile).tuitionBdt, profile.preferredCurrency)}</td>)}</tr>
                   <tr><td>Funding</td>{comparedPrograms.map((program) => <td key={program.id}>{program.scholarship}</td>)}</tr>
                   <tr><td>Deadline</td>{comparedPrograms.map((program) => <td key={program.id}>{program.deadline}</td>)}</tr>
                   <tr><td>Action</td>{comparedPrograms.map((program) => <td key={program.id}><button className="text-button" onClick={() => openProgram(program)}>Open match →</button><button className="remove-link" onClick={() => toggleCompare(program.id)}>Remove</button></td>)}</tr>
@@ -345,7 +349,7 @@ function Shortlist({ savedIds, compareIds, openProgram, toggleSaved, toggleCompa
 
         <section className="recommend-section">
           <div className="section-title"><div><span className="eyebrow">Saved options</span><h2>Your shortlist</h2></div></div>
-          {savedPrograms.length ? <div className="program-grid">{savedPrograms.map((program) => <ProgramCard key={program.id} program={program} score={scores[program.id]} onOpen={() => openProgram(program)} saved compared={compareIds.includes(program.id)} onSave={() => toggleSaved(program.id)} onCompare={() => toggleCompare(program.id)} />)}</div> : <EmptyState title="No programs saved yet" text="Explore your matches and save the options you want to revisit." />}
+          {savedPrograms.length ? <div className="program-grid">{savedPrograms.map((program) => <ProgramCard key={program.id} program={program} score={scores[program.id]} profile={profile} onOpen={() => openProgram(program)} saved compared={compareIds.includes(program.id)} onSave={() => toggleSaved(program.id)} onCompare={() => toggleCompare(program.id)} />)}</div> : <EmptyState title="No programs saved yet" text="Explore your matches and save the options you want to revisit." />}
         </section>
       </div>
     </>
@@ -461,7 +465,7 @@ function ProgramDetail({ program, score, profile, goBack, goRoadmap, saved, togg
             <section className="panel"><span className="eyebrow">Career direction</span><h2>Where this can take you</h2><div className="career-tags">{program.careerPaths.map((item) => <span key={item}>{item}</span>)}</div></section>
           </main>
           <aside>
-            <section className="panel cost-card"><span className="eyebrow">Interactive cost estimate</span><div className="cost-line"><small>Tuition</small><strong>{lakh(cost.tuitionBdt)}</strong></div><div className="cost-line"><small>Living estimate</small><strong>{lakh(cost.livingBdt)}</strong></div><div className="cost-line"><small>Visa, travel & applications</small><strong>{lakh(cost.visaTravelBdt + cost.applicationBdt)}</strong></div><label className="scholarship-input">Expected tuition scholarship <strong>{scholarshipPercent}%</strong><input type="range" min="0" max="100" step="10" value={scholarshipPercent} onChange={(event) => setScholarshipPercent(Number(event.target.value))} /></label><div className="cost-line green-text"><small>Scholarship deduction</small><strong>- {lakh(cost.scholarshipBdt)}</strong></div><div className="cost-line total"><small>Estimated first year</small><strong>{lakh(cost.firstYearBdt)}</strong></div><div className={`budget-result ${cost.budgetGapBdt <= 0 ? 'within' : 'gap'}`}><strong>{cost.budgetGapBdt <= 0 ? 'Within your budget' : `${lakh(cost.budgetGapBdt)} above budget`}</strong><small>Your stated annual budget: {lakh(profile.annualBudgetBdt)}</small></div><button className="primary wide" onClick={goRoadmap}>Add to my roadmap →</button><button className={`secondary wide ${saved ? 'saved-button' : ''}`} onClick={toggleSaved}>{saved ? '✓ Saved to shortlist' : 'Save to shortlist'}</button></section>
+            <section className="panel cost-card"><span className="eyebrow">Interactive cost estimate · {profile.preferredCurrency}</span><div className="cost-line"><small>Tuition</small><strong>{formatPreferredCurrency(cost.tuitionBdt, profile.preferredCurrency)}</strong></div><div className="cost-line"><small>Living estimate</small><strong>{formatPreferredCurrency(cost.livingBdt, profile.preferredCurrency)}</strong></div><div className="cost-line"><small>Visa, travel & applications</small><strong>{formatPreferredCurrency(cost.visaTravelBdt + cost.applicationBdt, profile.preferredCurrency)}</strong></div><label className="scholarship-input">Expected tuition scholarship <strong>{scholarshipPercent}%</strong><input type="range" min="0" max="100" step="10" value={scholarshipPercent} onChange={(event) => setScholarshipPercent(Number(event.target.value))} /></label><div className="cost-line green-text"><small>Scholarship deduction</small><strong>- {formatPreferredCurrency(cost.scholarshipBdt, profile.preferredCurrency)}</strong></div><div className="cost-line total"><small>Estimated first year</small><strong>{formatPreferredCurrency(cost.firstYearBdt, profile.preferredCurrency)}</strong></div><div className={`budget-result ${cost.budgetGapBdt <= 0 ? 'within' : 'gap'}`}><strong>{cost.budgetGapBdt <= 0 ? 'Within your budget' : `${formatPreferredCurrency(cost.budgetGapBdt, profile.preferredCurrency)} above budget`}</strong><small>Your stated annual budget: {formatPreferredCurrency(profile.annualBudgetBdt, profile.preferredCurrency)}</small></div><small className="rate-note">Prototype conversion uses fixed mock exchange rates, not live market rates.</small><button className="primary wide" onClick={goRoadmap}>Add to my roadmap →</button><button className={`secondary wide ${saved ? 'saved-button' : ''}`} onClick={toggleSaved}>{saved ? '✓ Saved to shortlist' : 'Save to shortlist'}</button></section>
             <section className="panel"><span className="eyebrow">Entry requirements</span><ul className="requirements">{program.requirements.map((item) => <li key={item}>{item}</li>)}</ul><div className="official-source"><span className="source-shield">✓</span><div><strong>Official reference available</strong><small>{program.sourceLabel}<br />Checked {program.verifiedAt}</small></div><ExternalLink href={program.programUrl}>Open source</ExternalLink></div><small className="source-note">Prototype values may be simplified. Always confirm fees, requirements and deadlines on the official page.</small></section>
           </aside>
         </div>
@@ -504,13 +508,15 @@ function Profile({ profile, onSave }: { profile: UserProfile, onSave: (profile: 
         <section className="profile-head"><div className="profile-avatar">{profile.fullName.split(' ').map((item) => item[0]).slice(0, 2).join('')}</div><div><span className="eyebrow">Application profile</span><h2>{profile.fullName}</h2><p>{profile.city}, {profile.country} · Changes update recommendations immediately</p></div><button className="secondary" onClick={() => { setDraft(profile); setEditing((value) => !value) }}>{editing ? 'Cancel editing' : 'Edit profile'}</button></section>
         {editing ? <section className="panel profile-editor"><div className="section-title"><div><span className="eyebrow">Personalization inputs</span><h2>Edit your guidance profile</h2></div></div><div className="field-grid">
           <label>Full name<input value={draft.fullName} onChange={(e) => setDraft({ ...draft, fullName: e.target.value })} /></label>
-          <label>Current institution<input value={draft.institution} onChange={(e) => setDraft({ ...draft, institution: e.target.value })} /></label>
+          <Autocomplete label="Current institution" value={draft.institution} options={universities} onChange={(institution) => setDraft({ ...draft, institution })} placeholder="Start typing a university" />
           <label>Current degree<input value={draft.currentDegree} onChange={(e) => setDraft({ ...draft, currentDegree: e.target.value })} /></label>
           <label>CGPA<input type="number" min="0" max="4" step=".01" value={draft.cgpa} onChange={(e) => setDraft({ ...draft, cgpa: Number(e.target.value) })} /></label>
-          <label>Target subject<input value={draft.subject} onChange={(e) => setDraft({ ...draft, subject: e.target.value })} /></label>
+          <Autocomplete label="Target subject" value={draft.subject} options={subjects} onChange={(subject) => setDraft({ ...draft, subject })} placeholder="Start typing a subject" />
           <label>Preferred intake<select value={draft.preferredIntake} onChange={(e) => setDraft({ ...draft, preferredIntake: e.target.value })}><option>Fall 2027</option><option>Spring 2027</option><option>Fall 2028</option></select></label>
-          <label>Preferred countries<input value={draft.preferredCountries.join(', ')} onChange={(e) => setDraft({ ...draft, preferredCountries: e.target.value.split(',').map((item) => item.trim()).filter(Boolean) })} /></label>
-          <label>Annual budget (BDT)<input type="number" step="100000" value={draft.annualBudgetBdt} onChange={(e) => setDraft({ ...draft, annualBudgetBdt: Number(e.target.value) })} /></label>
+          <Autocomplete label="Current country" value={draft.country} options={countries} onChange={(country) => setDraft({ ...draft, country })} placeholder="Start typing a country" />
+          <MultiAutocomplete label="Preferred countries" values={draft.preferredCountries} options={countries} onChange={(preferredCountries) => setDraft({ ...draft, preferredCountries })} />
+          <label>Preferred currency<select value={draft.preferredCurrency} onChange={(e) => setDraft({ ...draft, preferredCurrency: e.target.value })}>{currencies.map((currency) => <option value={currency.code} key={currency.code}>{currency.code} — {currency.label}</option>)}</select></label>
+          <label>Annual budget ({draft.preferredCurrency})<input type="number" step="1000" value={bdtToPreferred(draft.annualBudgetBdt, draft.preferredCurrency)} onChange={(e) => setDraft({ ...draft, annualBudgetBdt: preferredToBdt(Number(e.target.value), draft.preferredCurrency) })} /></label>
           <label>IELTS status<select value={draft.ieltsStatus} onChange={(e) => setDraft({ ...draft, ieltsStatus: e.target.value as UserProfile['ieltsStatus'] })}><option value="not-planned">Not planned</option><option value="planning">Planning</option><option value="completed">Completed</option></select></label>
           <label>IELTS score<input type="number" min="0" max="9" step=".5" value={draft.ieltsScore} onChange={(e) => setDraft({ ...draft, ieltsScore: Number(e.target.value) })} disabled={draft.ieltsStatus !== 'completed'} /></label>
           <label className="check-field"><input type="checkbox" checked={draft.transcriptReady} onChange={(e) => setDraft({ ...draft, transcriptReady: e.target.checked })} /> Transcript is ready</label>
@@ -518,7 +524,7 @@ function Profile({ profile, onSave }: { profile: UserProfile, onSave: (profile: 
         </div><div className="profile-save"><button className="primary" onClick={save}>Save and recalculate guidance →</button></div></section> :
         <div className="profile-grid">
           <section className="panel"><div className="section-title"><h2>Academic background</h2><span className="verified">Profile data</span></div><div className="info-row"><small>Current degree</small><strong>{profile.currentDegree}</strong></div><div className="info-row"><small>Institution</small><strong>{profile.institution}</strong></div><div className="info-row"><small>CGPA</small><strong>{profile.cgpa.toFixed(2)} / 4.00</strong></div><div className="info-row"><small>IELTS</small><strong>{profile.ieltsStatus === 'completed' ? profile.ieltsScore : profile.ieltsStatus}</strong></div></section>
-          <section className="panel"><div className="section-title"><h2>Study preferences</h2></div><div className="info-row"><small>Target</small><strong>{profile.targetDegree} · {profile.subject}</strong></div><div className="info-row"><small>Preferred intake</small><strong>{profile.preferredIntake}</strong></div><div className="info-row"><small>Destinations</small><strong>{profile.preferredCountries.join(', ')}</strong></div><div className="info-row"><small>Annual budget</small><strong>{lakh(profile.annualBudgetBdt)}</strong></div></section>
+          <section className="panel"><div className="section-title"><h2>Study preferences</h2></div><div className="info-row"><small>Target</small><strong>{profile.targetDegree} · {profile.subject}</strong></div><div className="info-row"><small>Preferred intake</small><strong>{profile.preferredIntake}</strong></div><div className="info-row"><small>Destinations</small><strong>{profile.preferredCountries.join(', ')}</strong></div><div className="info-row"><small>Annual budget</small><strong>{formatPreferredCurrency(profile.annualBudgetBdt, profile.preferredCurrency)}</strong></div><div className="info-row"><small>Display currency</small><strong>{profile.preferredCurrency}</strong></div></section>
         </div>}
       </div>
     </>
@@ -554,9 +560,9 @@ function App() {
       <Sidebar view={view} setView={setView} onLogout={logout} />
       <main className="workspace">
         {view === 'dashboard' && <Dashboard setView={setView} openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} profile={profile} scores={scores} notifications={notifications} />}
-        {view === 'explore' && <Explore openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} openCompare={() => setView('shortlist')} scores={scores} />}
+        {view === 'explore' && <Explore openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} openCompare={() => setView('shortlist')} scores={scores} profile={profile} />}
         {view === 'program' && <ProgramDetail program={selectedProgram} score={scores[selectedProgram.id]} profile={profile} goBack={() => setView('explore')} goRoadmap={() => setView('roadmap')} saved={savedIds.includes(selectedProgram.id)} toggleSaved={() => toggleSaved(selectedProgram.id)} />}
-        {view === 'shortlist' && <Shortlist savedIds={savedIds} compareIds={compareIds} openProgram={openProgram} toggleSaved={toggleSaved} toggleCompare={toggleCompare} scores={scores} />}
+        {view === 'shortlist' && <Shortlist savedIds={savedIds} compareIds={compareIds} openProgram={openProgram} toggleSaved={toggleSaved} toggleCompare={toggleCompare} scores={scores} profile={profile} />}
         {view === 'scholarships' && <Scholarships openProgram={openProgram} />}
         {view === 'roadmap' && <Roadmap />}
         {view === 'adviser' && <Adviser />}

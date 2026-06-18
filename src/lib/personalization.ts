@@ -1,4 +1,5 @@
 import type { AppNotification, CostEstimate, Program, ProgramScore, UserProfile } from '../types'
+import { currencies } from '../data/referenceData'
 
 export const defaultProfile: UserProfile = {
   fullName: 'Samira Rahman',
@@ -13,6 +14,7 @@ export const defaultProfile: UserProfile = {
   subject: 'Data Science & AI',
   preferredIntake: 'Fall 2027',
   preferredCountries: ['Germany', 'Finland', 'Netherlands'],
+  preferredCurrency: 'USD',
   annualBudgetBdt: 2500000,
   ieltsStatus: 'planning',
   ieltsScore: 0,
@@ -106,4 +108,24 @@ export function buildNotifications(profile: UserProfile, strongest: Program): Ap
 
 export function lakh(value: number) {
   return `BDT ${(value / 100000).toFixed(1)} lakh`
+}
+
+export function formatPreferredCurrency(valueBdt: number, currencyCode: string) {
+  const currency = currencies.find((item) => item.code === currencyCode) ?? currencies[0]
+  const value = valueBdt / currency.bdtPerUnit
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency.code,
+    maximumFractionDigits: currency.code === 'JPY' ? 0 : 0,
+  }).format(value)
+}
+
+export function preferredToBdt(value: number, currencyCode: string) {
+  const currency = currencies.find((item) => item.code === currencyCode) ?? currencies[0]
+  return Math.round(value * currency.bdtPerUnit)
+}
+
+export function bdtToPreferred(valueBdt: number, currencyCode: string) {
+  const currency = currencies.find((item) => item.code === currencyCode) ?? currencies[0]
+  return Math.round(valueBdt / currency.bdtPerUnit)
 }

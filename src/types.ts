@@ -79,6 +79,7 @@ export type UserProfile = {
   subject: string
   preferredIntake: string
   preferredCountries: string[]
+  preferredCurrency: string
   annualBudgetBdt: number
   ieltsStatus: 'not-planned' | 'planning' | 'completed'
   ieltsScore: number

@@ -36,6 +36,18 @@
 .auth-tabs button { border:0; padding:10px; border-radius:9px; color:var(--muted); background:transparent; font-weight:700; }
 .auth-tabs button.active { background:white; color:var(--ink); box-shadow:0 3px 10px rgba(23,36,61,.08); }
 form label,.field-grid label { display:flex; flex-direction:column; gap:7px; margin-bottom:17px; font-size:13px; font-weight:700; }
+.autocomplete-field { min-width:0; }
+.autocomplete { position:relative; }
+.suggestion-list { position:absolute; top:calc(100% + 5px); left:0; right:0; z-index:30; max-height:245px; overflow-y:auto; background:white; border:1px solid #d8e0eb; border-radius:10px; box-shadow:0 14px 35px rgba(20,39,68,.14); padding:5px; }
+.suggestion-list button { display:block; width:100%; border:0; border-radius:7px; background:white; color:#52627a; padding:9px 10px; text-align:left; font-size:11px; }
+.suggestion-list button:hover { background:#eef3ff; color:var(--blue); }
+.suggestion-list strong { color:var(--blue); }
+.multi-autocomplete { min-height:47px; border:1px solid #d9e0eb; border-radius:10px; background:white; padding:7px; }
+.multi-autocomplete:focus-within { border-color:#6a87df; }
+.multi-autocomplete .autocomplete input { border:0; padding:6px; }
+.selected-tags { display:flex; flex-wrap:wrap; gap:5px; }
+.selected-tags span { display:flex; align-items:center; gap:4px; border-radius:20px; padding:5px 8px; color:#3854a9; background:#edf2ff; font-size:9px; font-weight:700; }
+.selected-tags button { border:0; background:transparent; color:#6478b6; padding:0; font-size:13px; }
 input,select { width:100%; padding:13px 14px; border:1px solid #d9e0eb; background:white; border-radius:10px; color:var(--ink); }
 input:focus,select:focus { border-color:#6a87df; }
 .form-error { color:#b42318; font-size:13px; }
@@ -182,6 +194,7 @@ input:focus,select:focus { border-color:#6a87df; }
 .cost-card .secondary { margin-top:8px; }
 .scholarship-input { display:flex; flex-wrap:wrap; justify-content:space-between; gap:7px; color:var(--muted); font-size:9px; padding:12px 0; border-bottom:1px solid var(--line); }.scholarship-input strong { color:var(--ink); }.scholarship-input input { flex-basis:100%; padding:0; accent-color:var(--teal); }
 .budget-result { display:flex; flex-direction:column; gap:3px; border-radius:9px; padding:11px; margin:0 0 13px; }.budget-result.within { background:#eaf7f4; color:#137165; }.budget-result.gap { background:#fff1e3; color:#a05f0b; }.budget-result strong { font-size:10px; }.budget-result small { font-size:8px; opacity:.8; }
+.rate-note { display:block; color:#8c98a8; font-size:8px; line-height:1.4; margin:-5px 0 12px; }
 .saved-button { color:var(--teal); border-color:#a8d9d1; background:#eef9f7; }
 .requirements { padding-left:18px; color:#4e5f75; font-size:11px; line-height:1.9; }.source-note { display:block; color:#97a3b2; border-top:1px solid var(--line); padding-top:12px; line-height:1.45; }
 .official-source,.source-strip { display:flex; align-items:center; gap:10px; background:#eef8f6; border:1px solid #d2ebe6; border-radius:10px; padding:11px; margin:13px 0; }

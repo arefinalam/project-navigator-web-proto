@@ -6,7 +6,14 @@ export function usePersistentState<T>(key: string, initialValue: T) {
     if (!saved) return initialValue
 
     try {
-      return JSON.parse(saved) as T
+      const parsed = JSON.parse(saved) as T
+      if (
+        typeof initialValue === 'object' && initialValue !== null && !Array.isArray(initialValue) &&
+        typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+      ) {
+        return { ...initialValue, ...parsed }
+      }
+      return parsed
     } catch {
       return initialValue
     }
