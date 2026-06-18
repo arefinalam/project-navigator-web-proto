@@ -125,6 +125,9 @@ input:focus,select:focus { border-color:#6a87df; }
 .program-card { background:white; border:1px solid var(--line); border-radius:14px; padding:19px; transition:.2s ease; cursor:pointer; }
 .program-card:hover { transform:translateY(-3px); box-shadow:0 15px 35px rgba(27,48,80,.1); border-color:#cbd6e8; }
 .program-top { display:flex; justify-content:space-between; align-items:center; }
+.card-actions { display:flex; align-items:center; gap:9px; }
+.card-actions>button { width:31px; height:31px; border:1px solid var(--line); border-radius:50%; background:white; color:#8a97a8; font-size:16px; }
+.card-actions>button.saved { color:#d74f67; background:#fff0f3; border-color:#ffd2da; }
 .uni-logo { width:43px; height:43px; display:grid; place-items:center; border-radius:10px; color:white; font:800 12px 'Manrope'; }
 .uni-logo.large { width:64px; height:64px; border-radius:15px; font-size:16px; }
 .match-ring { width:45px; height:45px; display:grid; place-items:center; border-radius:50%; background:conic-gradient(var(--teal) 0 var(--score),#e6ecef var(--score)); position:relative; }
@@ -137,7 +140,12 @@ input:focus,select:focus { border-color:#6a87df; }
 .tag-row span,.career-tags span { background:#f0f3f8; color:#53647b; padding:5px 7px; border-radius:5px; font-size:9px; }
 .program-meta { display:grid; grid-template-columns:1fr 1fr; border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:12px 0; }
 .program-meta div { display:flex; flex-direction:column; }.program-meta small { color:var(--muted); font-size:9px; }.program-meta strong { font-size:11px; margin-top:3px; }
-.program-card>button { width:100%; border:0; background:transparent; color:var(--blue); font-weight:800; font-size:11px; display:flex; justify-content:space-between; padding:14px 0 0; }
+.program-card-footer { display:flex; justify-content:space-between; align-items:center; padding-top:13px; }
+.program-card-footer label { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:10px; cursor:pointer; }
+.program-card-footer input { width:auto; accent-color:var(--blue); }
+.program-card-footer button { border:0; background:transparent; color:var(--blue); font-weight:800; font-size:11px; display:flex; gap:8px; }
+.compare-banner { margin:0 0 16px; padding:13px 16px; border-radius:11px; background:#eaf0ff; color:#304b8f; display:flex; align-items:center; justify-content:space-between; font-size:12px; }
+.compare-banner button { border:0; border-radius:8px; background:var(--blue); color:white; padding:9px 13px; font-weight:700; }
 .explore-hero { padding:34px 37px; border-radius:17px; background:linear-gradient(115deg,#142f50,#25587a); color:white; }
 .explore-hero h2 { font-size:30px; margin:8px 0; }.explore-hero p { color:#c8d8e4; }
 .search-box { margin-top:23px; background:white; border-radius:10px; display:flex; align-items:center; gap:10px; padding:0 14px; max-width:600px; color:#7d8ba0; }
@@ -159,6 +167,7 @@ input:focus,select:focus { border-color:#6a87df; }
 .career-tags span { font-size:11px; padding:7px 9px; background:#eef3ff; color:#3854a9; }
 .cost-line { display:flex; justify-content:space-between; align-items:center; padding:11px 0; border-bottom:1px solid var(--line); }.cost-line strong { font-size:12px; }.cost-line.total { margin-bottom:14px; }.green-text { color:var(--teal); }
 .cost-card .secondary { margin-top:8px; }
+.saved-button { color:var(--teal); border-color:#a8d9d1; background:#eef9f7; }
 .requirements { padding-left:18px; color:#4e5f75; font-size:11px; line-height:1.9; }.source-note { display:block; color:#97a3b2; border-top:1px solid var(--line); padding-top:12px; }
 .roadmap-head { min-height:165px; background:linear-gradient(125deg,#173652,#187567); color:white; border-radius:16px; padding:30px 35px; display:flex; align-items:center; justify-content:space-between; }
 .roadmap-head h2 { font-size:27px; margin:8px 0; }.roadmap-head p { color:#c5ddd9; margin:0; }
@@ -173,6 +182,35 @@ input:focus,select:focus { border-color:#6a87df; }
 .advisor-card { padding:25px; border-radius:14px; background:#172f4e; color:white; }.advisor-card>span { color:#89dfd3; font-size:22px; }.advisor-card h3 { margin:10px 0 5px; }.advisor-card p { color:#bdccda; font-size:11px; line-height:1.5; }.advisor-card button { border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.08); color:white; border-radius:8px; padding:9px 12px; font-weight:700; }
 .profile-head { background:white; border:1px solid var(--line); border-radius:15px; padding:27px; display:flex; align-items:center; gap:18px; }.profile-avatar { width:67px; height:67px; display:grid; place-items:center; border-radius:50%; background:#dbe6ff; color:#284fa8; font:800 18px 'Manrope'; }.profile-head h2 { margin:4px 0 2px; }.profile-head p { color:var(--muted); font-size:11px; }.profile-head button { margin-left:auto; }
 .profile-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:18px; }.verified { color:var(--teal); background:#e9f6f3; padding:5px 8px; border-radius:20px; font-size:9px; }.info-row { display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--line); padding:13px 0; }.info-row small { color:var(--muted); }.info-row strong { font-size:12px; }
+.page-intro { min-height:155px; border-radius:16px; padding:30px 35px; color:white; background:linear-gradient(120deg,#18334f,#2c5f77); display:flex; justify-content:space-between; align-items:center; }
+.page-intro h2 { margin:7px 0; font-size:27px; }.page-intro p { color:#c9d9e4; margin:0; }
+.intro-count { min-width:135px; border-left:1px solid rgba(255,255,255,.2); padding-left:27px; display:flex; flex-direction:column; }.intro-count strong { font:800 32px 'Manrope'; }.intro-count span { color:#acd8d1; font-size:11px; }
+.comparison-section { margin-top:20px; background:white; border:1px solid var(--line); border-radius:14px; padding:22px; }
+.comparison-scroll { overflow-x:auto; }
+.comparison-table { width:100%; min-width:680px; border-collapse:collapse; }
+.comparison-table th,.comparison-table td { padding:13px; border-bottom:1px solid var(--line); text-align:left; font-size:11px; vertical-align:top; }
+.comparison-table th { color:var(--navy); background:#f5f7fa; font-size:10px; }
+.comparison-table th:first-child,.comparison-table td:first-child { width:115px; color:var(--muted); font-weight:700; }
+.comparison-table td:not(:first-child) { min-width:170px; }
+.score-chip { display:inline-block; color:var(--teal); background:#e8f6f3; padding:5px 8px; border-radius:20px; font-weight:800; }
+.remove-link { display:block; margin-top:5px; padding:2px 8px; border:0; background:transparent; color:#a65862; font-size:9px; }
+.empty-state { text-align:center; padding:55px 20px; border:1px dashed #cfd7e3; border-radius:14px; color:var(--muted); }.empty-state>span { font-size:32px; color:#9aaac1; }.empty-state h3 { color:var(--ink); margin:8px 0 5px; }.empty-state p { margin:0; font-size:12px; }
+.funding-hero { min-height:175px; padding:31px 37px; border-radius:17px; color:white; background:linear-gradient(120deg,#173550,#13756c); display:flex; align-items:center; justify-content:space-between; }
+.funding-hero h2 { font-size:28px; margin:8px 0; max-width:730px; }.funding-hero p { margin:0; color:#c5dfdb; max-width:750px; }.funding-hero>div:last-child { border-left:1px solid rgba(255,255,255,.2); padding-left:27px; display:flex; flex-direction:column; }.funding-hero>div:last-child strong { font:800 32px 'Manrope'; }.funding-hero>div:last-child span { color:#b8dcd7; font-size:10px; }
+.scholarship-grid { display:grid; grid-template-columns:1fr 1fr; gap:17px; margin-top:20px; }
+.scholarship-card { position:relative; background:white; border:1px solid var(--line); border-radius:14px; padding:24px; }
+.scholarship-card h3 { max-width:75%; font-size:17px; margin:7px 0; }.scholarship-card>p { color:var(--muted); font-size:11px; line-height:1.55; }
+.scholarship-score { position:absolute; right:20px; top:20px; width:62px; height:62px; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:50%; background:#eaf6f3; color:var(--teal); }.scholarship-score strong { font:800 16px 'Manrope'; }.scholarship-score span { font-size:7px; }
+.funding-value { display:flex; flex-direction:column; background:#f4f7fb; border-radius:9px; padding:12px; margin:15px 0; }.funding-value small { color:var(--muted); font-size:9px; }.funding-value strong { margin-top:3px; font-size:12px; }
+.eligibility-list { display:flex; flex-direction:column; gap:7px; color:#536479; font-size:10px; }.eligibility-list span::first-letter { color:var(--teal); }
+.scholarship-footer { display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--line); margin-top:17px; padding-top:13px; color:var(--muted); font-size:9px; }.scholarship-footer button { border:0; background:transparent; color:var(--blue); font-weight:800; }
+.adviser-page { max-width:1050px; }
+.chat-shell { min-height:calc(100vh - 140px); background:white; border:1px solid var(--line); border-radius:17px; display:flex; flex-direction:column; overflow:hidden; }
+.chat-header { display:flex; align-items:center; gap:14px; padding:22px 25px; border-bottom:1px solid var(--line); }.navigator-orb { width:48px; height:48px; border-radius:15px 15px 15px 5px; display:grid; place-items:center; color:white; background:linear-gradient(140deg,#3159d9,#128275); font:800 18px 'Manrope'; }.chat-header h2 { margin:2px 0; font-size:17px; }.chat-header p { color:var(--muted); margin:0; font-size:10px; }.online-pill { margin-left:auto; color:var(--teal); background:#eaf7f4; border-radius:20px; padding:6px 9px; font-size:9px; font-weight:800; }
+.suggestion-row { display:flex; gap:7px; padding:14px 20px; overflow-x:auto; border-bottom:1px solid var(--line); }.suggestion-row button { flex:0 0 auto; border:1px solid #dce3ed; color:#50627b; background:#f8fafc; border-radius:20px; padding:8px 11px; font-size:9px; }
+.messages { flex:1; padding:24px; background:#f7f9fc; overflow-y:auto; display:flex; flex-direction:column; gap:13px; }
+.message { max-width:75%; display:flex; flex-direction:column; gap:5px; }.message>div { padding:12px 14px; border-radius:13px; font-size:12px; line-height:1.55; }.message small { color:#8996a8; font-size:8px; padding-inline:5px; }.message.assistant { align-self:flex-start; }.message.assistant>div { background:white; border:1px solid var(--line); border-bottom-left-radius:4px; }.message.user { align-self:flex-end; }.message.user>div { background:var(--blue); color:white; border-bottom-right-radius:4px; }
+.chat-input { padding:16px 20px; display:flex; gap:10px; border-top:1px solid var(--line); }.chat-input input { border-radius:10px; }.chat-input button { border:0; border-radius:10px; background:var(--blue); color:white; padding:0 17px; font-weight:800; }
 .mobile-nav { display:none; }
 
 @media(max-width:1050px){
@@ -184,10 +222,13 @@ input:focus,select:focus { border-color:#6a87df; }
   .auth-page { display:block; }.auth-story { min-height:310px; padding:32px 25px; }.auth-story>.brand,.trust-row { display:none; }.auth-copy { margin:auto 0; }.auth-copy h1 { font-size:42px; letter-spacing:-2px; }.auth-copy p { font-size:14px; }.auth-panel { padding:35px 22px; }.mobile-brand { display:block; }
   .onboarding-page>header { padding:0 20px; }.stepper div { font-size:0; }.stepper div:not(:last-child)::after { margin:0 5px; }.onboarding-card { padding:28px 20px; }.choice-grid,.field-grid { grid-template-columns:1fr; }.onboarding-card h1 { font-size:27px; }
   .app-shell { display:block; padding-bottom:68px; }.sidebar { display:none; }.topbar { height:64px; padding:0 18px; }.topbar h1 { display:none; }.mobile-logo { display:block; }.top-actions button { display:none; }.page-content { padding:20px 16px 40px; }
-  .mobile-nav { display:grid; position:fixed; bottom:0; left:0; right:0; grid-template-columns:repeat(4,1fr); height:65px; background:white; border-top:1px solid var(--line); z-index:10; }.mobile-nav button { border:0; background:white; color:#8793a4; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; font-size:9px; }.mobile-nav button span { font-size:18px; }.mobile-nav button.active { color:var(--blue); font-weight:800; }
+  .mobile-nav { display:grid; position:fixed; bottom:0; left:0; right:0; grid-template-columns:repeat(5,1fr); height:65px; background:white; border-top:1px solid var(--line); z-index:10; }.mobile-nav button { border:0; background:white; color:#8793a4; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; font-size:9px; }.mobile-nav button span { font-size:18px; }.mobile-nav button.active { color:var(--blue); font-weight:800; }
   .welcome-banner { display:block; padding:27px 23px; }.welcome-banner h2 { font-size:25px; }.readiness { margin-top:24px; }.stat-grid { grid-template-columns:1fr; }.program-grid,.wide-grid { grid-template-columns:1fr; }.section-title { align-items:center; }.recommend-section .section-title { align-items:flex-start; }.recommend-section .section-title .text-button { font-size:0; }.recommend-section .section-title .text-button::after { content:'See all →'; font-size:11px; }
   .explore-hero { padding:27px 22px; }.explore-hero h2 { font-size:25px; }.filter-bar>span { display:none; }
   .detail-hero { grid-template-columns:auto 1fr; }.detail-score { grid-column:1/-1; border-left:0; border-top:1px solid var(--line); padding:13px 0 0; flex-direction:row; justify-content:center; gap:8px; align-items:baseline; }.detail-heading h1 { font-size:21px; }.detail-grid,.roadmap-layout,.profile-grid { grid-template-columns:1fr; }.reason-list,.fact-grid { grid-template-columns:1fr 1fr; }
   .roadmap-head { display:block; padding:26px 22px; }.roadmap-head h2 { font-size:24px; }.roadmap-progress { border-left:0; border-top:1px solid rgba(255,255,255,.2); padding:15px 0 0; margin-top:20px; flex-direction:row; gap:8px; align-items:baseline; }.roadmap-list { padding:18px 15px; }.roadmap-item { grid-template-columns:38px 1fr; }
   .profile-head { align-items:flex-start; flex-wrap:wrap; }.profile-head button { margin-left:0; width:100%; }
+  .page-intro,.funding-hero { display:block; padding:25px 22px; }.page-intro h2,.funding-hero h2 { font-size:23px; }.intro-count,.funding-hero>div:last-child { border-left:0; border-top:1px solid rgba(255,255,255,.2); padding:14px 0 0; margin-top:18px; flex-direction:row; align-items:baseline; gap:7px; }
+  .scholarship-grid { grid-template-columns:1fr; }.scholarship-card h3 { max-width:72%; }.compare-banner { align-items:flex-start; gap:12px; }.compare-banner button { white-space:nowrap; }
+  .message { max-width:90%; }.chat-shell { min-height:calc(100vh - 125px); }.chat-header { padding:18px; }.messages { padding:18px 13px; }.chat-input { padding:12px; }.chat-input button { padding:0 12px; }
 }

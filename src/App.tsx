@@ -1,45 +1,16 @@
 import { useMemo, useState } from 'react'
 import programsData from './data/programs.json'
 import roadmapData from './data/roadmap.json'
+import scholarshipsData from './data/scholarships.json'
+import { usePersistentState } from './hooks/usePersistentState'
+import type { ChatMessage, Program, RoadmapItem, Scholarship, View } from './types'
 import './App.css'
 
-type View = 'dashboard' | 'explore' | 'program' | 'roadmap' | 'profile'
 type AuthMode = 'login' | 'signup'
-
-type Program = {
-  id: string
-  university: string
-  program: string
-  country: string
-  city: string
-  flag: string
-  degree: string
-  duration: string
-  tuition: number
-  currency: string
-  intake: string
-  deadline: string
-  match: number
-  scholarship: string
-  ranking: string
-  description: string
-  requirements: string[]
-  matchReasons: string[]
-  careerPaths: string[]
-  accent: string
-}
-
-type RoadmapItem = {
-  id: number
-  title: string
-  description: string
-  due: string
-  status: 'completed' | 'current' | 'upcoming'
-  category: string
-}
 
 const programs = programsData as Program[]
 const initialRoadmap = roadmapData as RoadmapItem[]
+const scholarships = scholarshipsData as Scholarship[]
 
 const money = new Intl.NumberFormat('en-US')
 
@@ -183,7 +154,10 @@ function Sidebar({ view, setView, onLogout }: { view: View, setView: (view: View
   const links: { id: View, label: string, icon: string }[] = [
     { id: 'dashboard', label: 'Overview', icon: '⌂' },
     { id: 'explore', label: 'Explore programs', icon: '⌕' },
+    { id: 'shortlist', label: 'Shortlist & compare', icon: '◇' },
+    { id: 'scholarships', label: 'Scholarships', icon: '$' },
     { id: 'roadmap', label: 'My roadmap', icon: '✓' },
+    { id: 'adviser', label: 'Ask Navigator', icon: '✦' },
     { id: 'profile', label: 'My profile', icon: '○' },
   ]
   return (
@@ -205,12 +179,22 @@ function Topbar({ title }: { title: string }) {
   return <header className="topbar"><div><span className="mobile-logo"><Logo /></span><h1>{title}</h1></div><div className="top-actions"><button aria-label="Notifications">♢<span className="notification-dot" /></button><div className="avatar">SR</div></div></header>
 }
 
-function ProgramCard({ program, onOpen }: { program: Program, onOpen: () => void }) {
+function ProgramCard({ program, onOpen, saved, compared, onSave, onCompare }: {
+  program: Program
+  onOpen: () => void
+  saved: boolean
+  compared: boolean
+  onSave: () => void
+  onCompare: () => void
+}) {
   return (
-    <article className="program-card" onClick={onOpen}>
+    <article className="program-card">
       <div className="program-top">
         <div className="uni-logo" style={{ background: program.accent }}>{program.university.split(' ').map((word) => word[0]).slice(0, 2).join('')}</div>
-        <div className="match-ring" style={{ '--score': `${program.match * 3.6}deg` } as React.CSSProperties}><span>{program.match}%</span></div>
+        <div className="card-actions">
+          <button className={saved ? 'saved' : ''} onClick={onSave} aria-label={saved ? 'Remove from shortlist' : 'Save to shortlist'}>{saved ? '♥' : '♡'}</button>
+          <div className="match-ring" style={{ '--score': `${program.match * 3.6}deg` } as React.CSSProperties}><span>{program.match}%</span></div>
+        </div>
       </div>
       <span className="country">{program.flag} {program.city}, {program.country}</span>
       <h3>{program.program}</h3>
@@ -220,12 +204,22 @@ function ProgramCard({ program, onOpen }: { program: Program, onOpen: () => void
         <div><small>Annual tuition</small><strong>{program.currency} {money.format(program.tuition)}</strong></div>
         <div><small>Deadline</small><strong>{program.deadline}</strong></div>
       </div>
-      <button>View match <span>→</span></button>
+      <div className="program-card-footer">
+        <label><input type="checkbox" checked={compared} onChange={onCompare} /> Compare</label>
+        <button onClick={onOpen}>View match <span>→</span></button>
+      </div>
     </article>
   )
 }
 
-function Dashboard({ setView, openProgram }: { setView: (view: View) => void, openProgram: (program: Program) => void }) {
+function Dashboard({ setView, openProgram, savedIds, compareIds, toggleSaved, toggleCompare }: {
+  setView: (view: View) => void
+  openProgram: (program: Program) => void
+  savedIds: string[]
+  compareIds: string[]
+  toggleSaved: (id: string) => void
+  toggleCompare: (id: string) => void
+}) {
   const topPrograms = programs.slice(0, 3)
   return (
     <>
@@ -257,14 +251,21 @@ function Dashboard({ setView, openProgram }: { setView: (view: View) => void, op
 
         <section className="recommend-section">
           <div className="section-title"><div><span className="eyebrow">Recommended for you</span><h2>Your strongest program matches</h2></div><button className="text-button" onClick={() => setView('explore')}>Explore all programs →</button></div>
-          <div className="program-grid">{topPrograms.map((program) => <ProgramCard key={program.id} program={program} onOpen={() => openProgram(program)} />)}</div>
+          <div className="program-grid">{topPrograms.map((program) => <ProgramCard key={program.id} program={program} onOpen={() => openProgram(program)} saved={savedIds.includes(program.id)} compared={compareIds.includes(program.id)} onSave={() => toggleSaved(program.id)} onCompare={() => toggleCompare(program.id)} />)}</div>
         </section>
       </div>
     </>
   )
 }
 
-function Explore({ openProgram }: { openProgram: (program: Program) => void }) {
+function Explore({ openProgram, savedIds, compareIds, toggleSaved, toggleCompare, openCompare }: {
+  openProgram: (program: Program) => void
+  savedIds: string[]
+  compareIds: string[]
+  toggleSaved: (id: string) => void
+  toggleCompare: (id: string) => void
+  openCompare: () => void
+}) {
   const [country, setCountry] = useState('All countries')
   const [query, setQuery] = useState('')
   const filtered = useMemo(() => programs.filter((program) =>
@@ -280,15 +281,151 @@ function Explore({ openProgram }: { openProgram: (program: Program) => void }) {
         </section>
         <div className="filter-bar">
           <div>{['All countries', 'Germany', 'Finland', 'Netherlands'].map((item) => <button className={country === item ? 'active' : ''} onClick={() => setCountry(item)} key={item}>{item}</button>)}</div>
-          <span>{filtered.length} programs</span>
+          <span>{filtered.length} programs · {compareIds.length}/3 selected</span>
         </div>
-        <div className="program-grid wide-grid">{filtered.map((program) => <ProgramCard key={program.id} program={program} onOpen={() => openProgram(program)} />)}</div>
+        {compareIds.length >= 2 && <div className="compare-banner"><span><strong>{compareIds.length} programs selected.</strong> See their cost, match and funding side by side.</span><button onClick={openCompare}>Compare now →</button></div>}
+        <div className="program-grid wide-grid">{filtered.map((program) => <ProgramCard key={program.id} program={program} onOpen={() => openProgram(program)} saved={savedIds.includes(program.id)} compared={compareIds.includes(program.id)} onSave={() => toggleSaved(program.id)} onCompare={() => toggleCompare(program.id)} />)}</div>
       </div>
     </>
   )
 }
 
-function ProgramDetail({ program, goBack, goRoadmap }: { program: Program, goBack: () => void, goRoadmap: () => void }) {
+function Shortlist({ savedIds, compareIds, openProgram, toggleSaved, toggleCompare }: {
+  savedIds: string[]
+  compareIds: string[]
+  openProgram: (program: Program) => void
+  toggleSaved: (id: string) => void
+  toggleCompare: (id: string) => void
+}) {
+  const savedPrograms = programs.filter((program) => savedIds.includes(program.id))
+  const comparedPrograms = programs.filter((program) => compareIds.includes(program.id))
+
+  return (
+    <>
+      <Topbar title="Shortlist & comparison" />
+      <div className="page-content">
+        <section className="page-intro">
+          <div><span className="eyebrow">Decision workspace</span><h2>Turn interesting options into a balanced shortlist.</h2><p>Save any program, then select up to three to compare the factors that matter most.</p></div>
+          <div className="intro-count"><strong>{savedPrograms.length}</strong><span>saved programs</span></div>
+        </section>
+
+        {comparedPrograms.length > 0 && (
+          <section className="comparison-section">
+            <div className="section-title"><div><span className="eyebrow">Side-by-side</span><h2>Current comparison</h2></div><span className="muted">{comparedPrograms.length}/3 selected</span></div>
+            <div className="comparison-scroll">
+              <table className="comparison-table">
+                <thead><tr><th>Factor</th>{comparedPrograms.map((program) => <th key={program.id}>{program.university}</th>)}</tr></thead>
+                <tbody>
+                  <tr><td>Program</td>{comparedPrograms.map((program) => <td key={program.id}><strong>{program.program}</strong></td>)}</tr>
+                  <tr><td>Match</td>{comparedPrograms.map((program) => <td key={program.id}><span className="score-chip">{program.match}%</span></td>)}</tr>
+                  <tr><td>Tuition</td>{comparedPrograms.map((program) => <td key={program.id}>{program.currency} {money.format(program.tuition)}</td>)}</tr>
+                  <tr><td>Funding</td>{comparedPrograms.map((program) => <td key={program.id}>{program.scholarship}</td>)}</tr>
+                  <tr><td>Deadline</td>{comparedPrograms.map((program) => <td key={program.id}>{program.deadline}</td>)}</tr>
+                  <tr><td>Action</td>{comparedPrograms.map((program) => <td key={program.id}><button className="text-button" onClick={() => openProgram(program)}>Open match →</button><button className="remove-link" onClick={() => toggleCompare(program.id)}>Remove</button></td>)}</tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
+        <section className="recommend-section">
+          <div className="section-title"><div><span className="eyebrow">Saved options</span><h2>Your shortlist</h2></div></div>
+          {savedPrograms.length ? <div className="program-grid">{savedPrograms.map((program) => <ProgramCard key={program.id} program={program} onOpen={() => openProgram(program)} saved compared={compareIds.includes(program.id)} onSave={() => toggleSaved(program.id)} onCompare={() => toggleCompare(program.id)} />)}</div> : <EmptyState title="No programs saved yet" text="Explore your matches and save the options you want to revisit." />}
+        </section>
+      </div>
+    </>
+  )
+}
+
+function Scholarships({ openProgram }: { openProgram: (program: Program) => void }) {
+  return (
+    <>
+      <Topbar title="Scholarships" />
+      <div className="page-content">
+        <section className="funding-hero"><div><span className="eyebrow light">Funding strategy</span><h2>Reduce cost without building your plan around wishful thinking.</h2><p>These mock opportunities are ranked against your target countries, academic profile and shortlisted subject.</p></div><div><strong>4</strong><span>potential matches</span></div></section>
+        <div className="scholarship-grid">
+          {scholarships.map((item) => {
+            const related = programs.find((program) => item.countries.includes(program.country))
+            return <article className="scholarship-card" key={item.id}>
+              <div className="scholarship-score"><strong>{item.match}%</strong><span>funding fit</span></div>
+              <span className="eyebrow">{item.provider}</span><h3>{item.name}</h3><p>{item.note}</p>
+              <div className="funding-value"><small>Potential coverage</small><strong>{item.coverage}</strong></div>
+              <div className="eligibility-list">{item.eligibility.map((rule) => <span key={rule}>✓ {rule}</span>)}</div>
+              <div className="scholarship-footer"><span>Deadline: {item.deadline}</span>{related && <button onClick={() => openProgram(related)}>Related program →</button>}</div>
+            </article>
+          })}
+        </div>
+      </div>
+    </>
+  )
+}
+
+const adviserReplies = [
+  {
+    match: ['ielts', 'english'],
+    text: 'For your current shortlist, a 7.0 overall target is sensible. Begin with a diagnostic test, then spend six weeks on the two weakest skills. A 6.5 may satisfy several minimums, but 7.0 keeps more options comfortable.',
+    sources: ['Your roadmap', 'Mock program requirements']
+  },
+  {
+    match: ['germany', 'finland', 'country'],
+    text: 'Germany is the strongest budget fit because two matched programs have very low tuition. Finland offers clearer university scholarships, but the remaining tuition and living cost need a stronger sponsor plan.',
+    sources: ['Program comparison', 'Mock funding records']
+  },
+  {
+    match: ['scholarship', 'funding', 'cost'],
+    text: 'Your strongest funding match is Aalto University’s merit scholarship. Do not treat it as guaranteed: keep at least one low-tuition German option in your final shortlist and prepare financial evidence independently.',
+    sources: ['Scholarship matches', 'Your preferred budget']
+  },
+  {
+    match: ['shortlist', 'program', 'university'],
+    text: 'A balanced five-program shortlist for you would include two ambitious options, two realistic targets and one financially safe option. At the moment, TUM and Aalto are strong targets while Saarland is the clearest cost-safe choice.',
+    sources: ['Your profile', 'Program match scores']
+  }
+]
+
+function Adviser() {
+  const [input, setInput] = useState('')
+  const [messages, setMessages] = usePersistentState<ChatMessage[]>('navigator-chat', [{
+    id: 1,
+    role: 'assistant',
+    text: 'Hi Samira. I can help you think through your program matches, funding plan, IELTS preparation and roadmap. What decision are you working on?',
+    sources: ['Your profile', 'Prototype guidance data']
+  }])
+
+  const send = (question?: string) => {
+    const text = (question ?? input).trim()
+    if (!text) return
+    const lower = text.toLowerCase()
+    const response = adviserReplies.find((reply) => reply.match.some((keyword) => lower.includes(keyword))) ?? {
+      text: 'Based on your current profile, the best next step is to complete the IELTS diagnostic and compare your three strongest programs. That will expose both academic and affordability gaps before you invest time in documents.',
+      sources: ['Your roadmap', 'Current match scores']
+    }
+    setMessages((current) => [...current, { id: Date.now(), role: 'user', text }, { id: Date.now() + 1, role: 'assistant', text: response.text, sources: response.sources }])
+    setInput('')
+  }
+
+  return (
+    <>
+      <Topbar title="Ask Navigator" />
+      <div className="page-content adviser-page">
+        <section className="chat-shell">
+          <div className="chat-header"><div className="navigator-orb">N</div><div><span className="eyebrow">Mock AI adviser</span><h2>Navigator</h2><p>Answers from your profile and prototype data—not live AI yet.</p></div><span className="online-pill">● Ready</span></div>
+          <div className="suggestion-row">{['Which country fits my budget?', 'How should I prepare for IELTS?', 'Help me build a balanced shortlist', 'What funding should I prioritize?'].map((question) => <button onClick={() => send(question)} key={question}>{question}</button>)}</div>
+          <div className="messages">
+            {messages.map((message) => <div className={`message ${message.role}`} key={message.id}><div>{message.text}</div>{message.sources && <small>Based on: {message.sources.join(' · ')}</small>}</div>)}
+          </div>
+          <div className="chat-input"><input value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') send() }} placeholder="Ask about your options or next step…" /><button onClick={() => send()}>Send →</button></div>
+        </section>
+      </div>
+    </>
+  )
+}
+
+function EmptyState({ title, text }: { title: string, text: string }) {
+  return <div className="empty-state"><span>◇</span><h3>{title}</h3><p>{text}</p></div>
+}
+
+function ProgramDetail({ program, goBack, goRoadmap, saved, toggleSaved }: { program: Program, goBack: () => void, goRoadmap: () => void, saved: boolean, toggleSaved: () => void }) {
   return (
     <>
       <Topbar title="Program match" />
@@ -306,7 +443,7 @@ function ProgramDetail({ program, goBack, goRoadmap }: { program: Program, goBac
             <section className="panel"><span className="eyebrow">Career direction</span><h2>Where this can take you</h2><div className="career-tags">{program.careerPaths.map((item) => <span key={item}>{item}</span>)}</div></section>
           </main>
           <aside>
-            <section className="panel cost-card"><span className="eyebrow">Estimated cost</span><div className="cost-line"><small>Annual tuition</small><strong>{program.currency} {money.format(program.tuition)}</strong></div><div className="cost-line"><small>Scholarship</small><strong className="green-text">{program.scholarship}</strong></div><div className="cost-line total"><small>Estimated first year</small><strong>BDT 18–24 lakh</strong></div><button className="primary wide" onClick={goRoadmap}>Add to my roadmap →</button><button className="secondary wide">Save to shortlist</button></section>
+            <section className="panel cost-card"><span className="eyebrow">Estimated cost</span><div className="cost-line"><small>Annual tuition</small><strong>{program.currency} {money.format(program.tuition)}</strong></div><div className="cost-line"><small>Scholarship</small><strong className="green-text">{program.scholarship}</strong></div><div className="cost-line total"><small>Estimated first year</small><strong>BDT 18–24 lakh</strong></div><button className="primary wide" onClick={goRoadmap}>Add to my roadmap →</button><button className={`secondary wide ${saved ? 'saved-button' : ''}`} onClick={toggleSaved}>{saved ? '✓ Saved to shortlist' : 'Save to shortlist'}</button></section>
             <section className="panel"><span className="eyebrow">Entry requirements</span><ul className="requirements">{program.requirements.map((item) => <li key={item}>{item}</li>)}</ul><small className="source-note">Mock data · Last reviewed 18 Jun 2026</small></section>
           </aside>
         </div>
@@ -316,7 +453,7 @@ function ProgramDetail({ program, goBack, goRoadmap }: { program: Program, goBac
 }
 
 function Roadmap() {
-  const [items, setItems] = useState(initialRoadmap)
+  const [items, setItems] = usePersistentState<RoadmapItem[]>('navigator-roadmap', initialRoadmap)
   const complete = items.filter((item) => item.status === 'completed').length
   const toggle = (id: number) => setItems((current) => current.map((item) => item.id === id ? { ...item, status: item.status === 'completed' ? 'current' : 'completed' } : item))
   return (
@@ -358,25 +495,36 @@ function App() {
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem('navigator-onboarded') === 'true')
   const [view, setView] = useState<View>('dashboard')
   const [selectedProgram, setSelectedProgram] = useState<Program>(programs[0])
+  const [savedIds, setSavedIds] = usePersistentState<string[]>('navigator-shortlist', ['tum-ds', 'aalto-ml'])
+  const [compareIds, setCompareIds] = usePersistentState<string[]>('navigator-comparison', ['tum-ds', 'aalto-ml'])
 
   if (!authenticated) return <AuthScreen onAuthenticated={(isNew) => { setAuthenticated(true); if (isNew) setOnboarded(false) }} />
   if (!onboarded) return <Onboarding onComplete={() => { localStorage.setItem('navigator-onboarded', 'true'); setOnboarded(true) }} />
 
   const openProgram = (program: Program) => { setSelectedProgram(program); setView('program') }
   const logout = () => { localStorage.removeItem('navigator-session'); setAuthenticated(false) }
+  const toggleSaved = (id: string) => setSavedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
+  const toggleCompare = (id: string) => setCompareIds((current) => {
+    if (current.includes(id)) return current.filter((item) => item !== id)
+    if (current.length >= 3) return [...current.slice(1), id]
+    return [...current, id]
+  })
 
   return (
     <div className="app-shell">
       <Sidebar view={view} setView={setView} onLogout={logout} />
       <main className="workspace">
-        {view === 'dashboard' && <Dashboard setView={setView} openProgram={openProgram} />}
-        {view === 'explore' && <Explore openProgram={openProgram} />}
-        {view === 'program' && <ProgramDetail program={selectedProgram} goBack={() => setView('explore')} goRoadmap={() => setView('roadmap')} />}
+        {view === 'dashboard' && <Dashboard setView={setView} openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} />}
+        {view === 'explore' && <Explore openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} openCompare={() => setView('shortlist')} />}
+        {view === 'program' && <ProgramDetail program={selectedProgram} goBack={() => setView('explore')} goRoadmap={() => setView('roadmap')} saved={savedIds.includes(selectedProgram.id)} toggleSaved={() => toggleSaved(selectedProgram.id)} />}
+        {view === 'shortlist' && <Shortlist savedIds={savedIds} compareIds={compareIds} openProgram={openProgram} toggleSaved={toggleSaved} toggleCompare={toggleCompare} />}
+        {view === 'scholarships' && <Scholarships openProgram={openProgram} />}
         {view === 'roadmap' && <Roadmap />}
+        {view === 'adviser' && <Adviser />}
         {view === 'profile' && <Profile />}
       </main>
       <nav className="mobile-nav">
-        {([['dashboard', '⌂', 'Home'], ['explore', '⌕', 'Explore'], ['roadmap', '✓', 'Roadmap'], ['profile', '○', 'Profile']] as [View, string, string][]).map(([id, icon, label]) =>
+        {([['dashboard', '⌂', 'Home'], ['explore', '⌕', 'Explore'], ['shortlist', '◇', 'Saved'], ['roadmap', '✓', 'Roadmap'], ['adviser', '✦', 'Ask']] as [View, string, string][]).map(([id, icon, label]) =>
           <button className={view === id || (view === 'program' && id === 'explore') ? 'active' : ''} onClick={() => setView(id)} key={id}><span>{icon}</span>{label}</button>)}
       </nav>
     </div>

@@ -1,0 +1,46 @@
+[
+  {
+    "id": "aalto-excellence",
+    "name": "Aalto University Excellence Scholarship",
+    "provider": "Aalto University",
+    "countries": ["Finland"],
+    "coverage": "50–100% tuition waiver",
+    "deadline": "02 Jan 2027",
+    "match": 92,
+    "eligibility": ["Non-EU/EEA applicant", "Strong academic record", "Apply with the degree application"],
+    "note": "Your CGPA and target subject make this the strongest funding match in the current dataset."
+  },
+  {
+    "id": "daad-master",
+    "name": "DAAD Study Scholarship",
+    "provider": "German Academic Exchange Service",
+    "countries": ["Germany"],
+    "coverage": "Monthly stipend and selected allowances",
+    "deadline": "Varies by programme",
+    "match": 86,
+    "eligibility": ["Relevant bachelor's degree", "Strong motivation", "Programme-specific conditions"],
+    "note": "A promising option, but the exact DAAD route must be checked against each selected programme."
+  },
+  {
+    "id": "tampere-early",
+    "name": "Tampere University Tuition Scholarship",
+    "provider": "Tampere University",
+    "countries": ["Finland"],
+    "coverage": "50% tuition waiver",
+    "deadline": "03 Jan 2027",
+    "match": 82,
+    "eligibility": ["Fee-paying applicant", "Academic merit", "Submit within the admission round"],
+    "note": "Good affordability improvement for a programme already inside your target profile."
+  },
+  {
+    "id": "nl-high-potential",
+    "name": "Netherlands High-Potential Funding",
+    "provider": "Participating institutions",
+    "countries": ["Netherlands"],
+    "coverage": "Partial award; amount varies",
+    "deadline": "Institution specific",
+    "match": 68,
+    "eligibility": ["Non-EEA applicant", "Competitive academic profile", "Separate scholarship application may apply"],
+    "note": "Treat this as an ambitious funding route because Dutch programme costs exceed your ideal budget."
+  }
+]
