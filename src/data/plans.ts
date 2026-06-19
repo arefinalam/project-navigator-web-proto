@@ -5,6 +5,7 @@ export type GatedFeature =
   | 'careerPlan'
   | 'jobPreparation'
   | 'jobSearch'
+  | 'premiumCv'
   | 'shortlist'
   | 'scholarships'
   | 'roadmap'
@@ -20,6 +21,7 @@ export const featureMinimumPlan: Record<GatedFeature, SubscriptionPlan['id']> = 
   careerPlan: 'essential',
   jobPreparation: 'essential',
   jobSearch: 'essential',
+  premiumCv: 'plus',
   shortlist: 'essential',
   scholarships: 'essential',
   roadmap: 'essential',
@@ -72,7 +74,7 @@ export const plans: SubscriptionPlan[] = [
     monthlyUsd: 19,
     annualUsd: 190,
     recommended: true,
-    features: ['Everything in Essential', 'Three active services', 'Unlimited shortlist', 'Advanced analysis', '100 adviser messages/month'],
+    features: ['Everything in Essential', 'Three active planning tracks', 'Unlimited shortlist', 'Advanced analysis', '100 adviser messages/month'],
     limits: { activeGoals: 3, shortlist: 999, comparisons: 5, adviserMessages: 100, documentFolders: 999, expertCredits: 0 },
   },
   {
@@ -81,7 +83,7 @@ export const plans: SubscriptionPlan[] = [
     tagline: 'Digital guidance plus recurring human review.',
     monthlyUsd: 49,
     annualUsd: 490,
-    features: ['Everything in Plus', 'Five active services', 'One expert credit/month', 'Priority consultation slots', 'Expert-ready reviews'],
+    features: ['Everything in Plus', 'Five active planning tracks', 'One expert credit/month', 'Priority consultation slots', 'Expert-ready reviews'],
     limits: { activeGoals: 5, shortlist: 999, comparisons: 5, adviserMessages: 250, documentFolders: 999, expertCredits: 1 },
   },
 ]

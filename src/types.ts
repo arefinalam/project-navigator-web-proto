@@ -211,6 +211,13 @@ export type JobPreparationProfile = {
   interviewConfidence: number
   practiceSessions: number
   completedTasks: string[]
+  cvDraft: {
+    headline: string
+    summary: string
+    experience: string
+    projects: string
+    skills: string
+  }
 }
 
 export type JobListing = {

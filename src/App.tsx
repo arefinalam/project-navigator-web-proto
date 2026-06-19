@@ -11,6 +11,7 @@ import { experts } from './data/experts'
 import { careerRoles, careerTasks, defaultCareerProfile } from './data/careers'
 import { defaultJobPreparationProfile, interviewPrompts, jobPreparationTasks } from './data/jobPreparation'
 import { defaultJobApplications, jobs } from './data/jobs'
+import { destinationInsights } from './data/destinationInsights'
 import { canUseFeature, minimumPlanName, plans, type GatedFeature } from './data/plans'
 import { bdtToPreferred, buildNotifications, defaultProfile, estimateCost, formatPreferredCurrency, formatProfileCurrency, formatProfileDate, preferredToBdt, scoreProgram } from './lib/personalization'
 import type { ApplicationRecord, ApplicationStatus, AppNotification, CareerProfile, CareerRole, ChatMessage, ConsultationBooking, DocumentFile, Expert, JobApplication, JobPreparationProfile, Program, ProgramScore, RoadmapItem, Scholarship, ServiceState, ServiceType, StudyPhaseId, SubscriptionPlan, SubscriptionState, UserDocument, UserProfile, View } from './types'
@@ -34,6 +35,16 @@ function serviceFromGoal(goal: string): ServiceType {
   if (goal === 'Job preparation') return 'job-preparation'
   if (goal === 'Job search') return 'job-search'
   return 'study'
+}
+
+const careerBundle: ServiceType[] = ['career', 'job-preparation', 'job-search']
+
+function servicesForGoal(goal: string): ServiceType[] {
+  return goal === 'Career planning' ? careerBundle : ['study']
+}
+
+function planningTrackCount(active: ServiceType[]) {
+  return Number(active.includes('study')) + Number(active.some((service) => careerBundle.includes(service)))
 }
 
 const bn: Record<string, string> = {
@@ -88,11 +99,12 @@ function normalizeDocuments(saved: UserDocument[]) {
   return [...normalized, ...custom]
 }
 
-function Logo() {
+function Logo({ onClick }: { onClick?: () => void } = {}) {
+  const content = <><span className="brand-mark">N</span><span>Project <strong>Navigator</strong></span></>
+  if (onClick) return <button className="brand logo-button" aria-label="Project Navigator home" onClick={onClick}>{content}</button>
   return (
     <div className="brand" aria-label="Project Navigator">
-      <span className="brand-mark">N</span>
-      <span>Project <strong>Navigator</strong></span>
+      {content}
     </div>
   )
 }
@@ -103,7 +115,7 @@ function ExternalLink({ href, children, className = '' }: { href: string, childr
 
 function PublicLanding({ onStart, onDemo }: { onStart: () => void, onDemo: () => void }) {
   return <main className="landing-page">
-    <header className="landing-nav"><Logo /><nav aria-label="Public navigation"><a href="#how-it-works">How it works</a><a href="#features">Features</a><a href="#plans">Plans</a></nav><div><button className="text-button" onClick={onStart}>Log in</button><button className="primary small" onClick={onStart}>Build my plan</button></div></header>
+    <header className="landing-nav"><Logo onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} /><nav aria-label="Public navigation"><a href="#how-it-works">How it works</a><a href="#features">Features</a><a href="#plans">Plans</a></nav><div><button className="text-button" onClick={onStart}>Log in</button><button className="primary small" onClick={onStart}>Build my plan</button></div></header>
     <section className="landing-hero">
       <div><span className="eyebrow">Important decisions, made navigable</span><h1>A personal route from “maybe” to <em>ready.</em></h1><p>Plan study, career and job goals, build evidence, track applications, and bring in expert help—without losing the thread.</p><div className="landing-actions"><button className="primary" onClick={onStart}>Create my guidance profile →</button><button className="secondary" onClick={onDemo}>Explore the demo</button></div><small>No payment required · Prototype data stays in this browser</small></div>
       <div className="landing-preview" aria-label="Product preview"><div className="preview-head"><span>Samira’s study plan</span><strong>74% ready</strong></div><div className="preview-route"><span className="done">✓</span><div><strong>Profile and goals</strong><small>Complete</small></div></div><div className="preview-route"><span className="active">2</span><div><strong>Research and shortlist</strong><small>3 strong programme matches</small></div></div><div className="preview-route"><span>3</span><div><strong>Tests and documents</strong><small>IELTS is the next priority</small></div></div><div className="preview-match"><small>Strongest current match</small><strong>Technical University of Munich</strong><span>88% profile fit · budget needs funding</span></div></div>
@@ -148,7 +160,7 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (isNew: boolean) => 
   return (
     <main className="auth-page">
       <section className="auth-story">
-        <Logo />
+        <Logo onClick={() => setShowAuth(false)} />
         <div className="auth-copy">
           <span className="eyebrow light">Your ambition, mapped.</span>
           <h1>Build a future that fits <em>you.</em></h1>
@@ -166,7 +178,7 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (isNew: boolean) => 
       <section className="auth-panel">
         <div className="auth-card">
           <button className="auth-back" onClick={() => setShowAuth(false)}>← Back to overview</button>
-          <span className="mobile-brand"><Logo /></span>
+          <span className="mobile-brand"><Logo onClick={() => setShowAuth(false)} /></span>
           <span className="eyebrow">{mode === 'login' ? 'Welcome back' : 'Start your journey'}</span>
           <h2>{mode === 'login' ? 'Continue your roadmap' : 'Create your free profile'}</h2>
           <p className="muted">{mode === 'login' ? 'Sign in to review your next best action.' : 'It takes about five minutes to get your first guidance.'}</p>
@@ -194,14 +206,20 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (isNew: boolean) => 
   )
 }
 
-function Onboarding({ profile, onComplete }: { profile: UserProfile, onComplete: (profile: UserProfile) => void }) {
+function Onboarding({ profile, career, onComplete, onExit }: { profile: UserProfile, career: CareerProfile, onComplete: (profile: UserProfile, career: CareerProfile) => void, onExit: () => void }) {
   const [step, setStep] = useState(1)
   const [draft, setDraft] = useState(profile)
+  const [careerDraft, setCareerDraft] = useState(career)
   const steps = ['Your goal', 'Education', 'Preferences']
+  const careerTrack = draft.goal === 'Career planning'
+  const toggleCareerValue = (field: 'workStyle' | 'interests' | 'currentSkills', value: string) => setCareerDraft((current) => ({
+    ...current,
+    [field]: current[field].includes(value) ? current[field].filter((item) => item !== value) : [...current[field], value],
+  }))
 
   return (
     <main className="onboarding-page">
-      <header><Logo /><span className="step-label">Profile setup · {step} of 3</span></header>
+      <header><Logo onClick={onExit} /><span className="step-label">Profile setup · {step} of 3</span></header>
       <div className="onboarding-shell">
         <div className="stepper">
           {steps.map((item, index) => <div className={index + 1 <= step ? 'done' : ''} key={item}><span>{index + 1}</span>{item}</div>)}
@@ -210,12 +228,12 @@ function Onboarding({ profile, onComplete }: { profile: UserProfile, onComplete:
           {step === 1 && <>
             <span className="eyebrow">Let’s begin</span>
             <h1>What would you like help with?</h1>
-            <p className="muted">Choose your primary goal. You can add more services later.</p>
+            <p className="muted">Choose one planning track. Career Planning includes career direction, job preparation and job search.</p>
             <div className="choice-grid">
-              {['Study abroad', 'Career planning', 'Job preparation', 'Job search'].map((item) =>
+              {['Study abroad', 'Career planning'].map((item) =>
                 <button className={draft.goal === item ? 'selected' : ''} onClick={() => setDraft({ ...draft, goal: item })} key={item}>
-                  <span className="choice-icon">{item === 'Study abroad' ? '✦' : item === 'Career planning' ? '⌁' : item === 'Job preparation' ? '◫' : '⌕'}</span>
-                  <strong>{item}</strong><small>{item === 'Study abroad' ? 'Programs, funding and applications' : item === 'Career planning' ? 'Find a direction that fits' : item === 'Job preparation' ? 'CV, skills and interviews' : 'Find roles and track applications'}</small>
+                  <span className="choice-icon">{item === 'Study abroad' ? '✦' : '↗'}</span>
+                  <strong>{item}</strong><small>{item === 'Study abroad' ? 'Programs, destination life, funding and applications' : 'Career direction, CV, interview preparation and job search'}</small>
                 </button>)}
             </div>
           </>}
@@ -223,8 +241,9 @@ function Onboarding({ profile, onComplete }: { profile: UserProfile, onComplete:
             <span className="eyebrow">{draft.goal === 'Study abroad' ? 'Your academic direction' : 'Your current background'}</span>
             <h1>{draft.goal === 'Study abroad' ? 'What do you want to study?' : 'What experience are you bringing?'}</h1>
             <div className="field-grid">
-              <label>{draft.goal === 'Study abroad' ? 'Target degree' : 'Highest/current degree'}<select value={draft.targetDegree} onChange={(e) => setDraft({ ...draft, targetDegree: e.target.value })}><option>Master’s</option><option>Bachelor’s</option><option>PhD</option></select></label>
+              <label>{careerTrack ? 'Highest/current degree' : 'Target degree'}<select value={draft.targetDegree} onChange={(e) => setDraft({ ...draft, targetDegree: e.target.value })}><option>Master’s</option><option>Bachelor’s</option><option>PhD</option></select></label>
               <Autocomplete label={draft.goal === 'Study abroad' ? 'Subject area' : 'Background area'} value={draft.subject} options={subjects} onChange={(subject) => setDraft({ ...draft, subject })} placeholder="Start typing a subject" />
+              {careerTrack && <><label>Current degree or role<input value={draft.currentDegree} onChange={(e) => setDraft({ ...draft, currentDegree: e.target.value })} /></label><Autocomplete label="Institution or employer" value={draft.institution} options={universities} onChange={(institution) => setDraft({ ...draft, institution })} placeholder="Institution or employer" /><label>Experience level<select value={careerDraft.experienceLevel} onChange={(event) => setCareerDraft({ ...careerDraft, experienceLevel: event.target.value as CareerProfile['experienceLevel'] })}><option value="student">Student</option><option value="entry">Entry level</option><option value="mid">Mid-career</option><option value="senior">Senior</option></select></label><label>Career objective<select value={careerDraft.careerGoal} onChange={(event) => setCareerDraft({ ...careerDraft, careerGoal: event.target.value as CareerProfile['careerGoal'] })}><option value="first-role">Find my first role</option><option value="career-change">Change career</option><option value="promotion">Prepare for progression</option><option value="exploration">Explore options</option></select></label></>}
               <label>Current CGPA<input type="number" min="0" max="4" step=".01" value={draft.cgpa} onChange={(e) => setDraft({ ...draft, cgpa: Number(e.target.value) })} /></label>
               <label>Graduation year<input type="number" value={draft.graduationYear} onChange={(e) => setDraft({ ...draft, graduationYear: Number(e.target.value) })} /></label>
             </div>
@@ -232,7 +251,7 @@ function Onboarding({ profile, onComplete }: { profile: UserProfile, onComplete:
           {step === 3 && <>
             <span className="eyebrow">Make it realistic</span>
             <h1>Tell us what matters to you</h1>
-            <div className="field-grid">
+            {!careerTrack ? <div className="field-grid">
               <label>Preferred intake<select value={draft.preferredIntake} onChange={(e) => setDraft({ ...draft, preferredIntake: e.target.value })}><option>Fall 2027</option><option>Spring 2027</option><option>Fall 2028</option></select></label>
               <label>Preferred currency<select value={draft.preferredCurrency} onChange={(e) => setDraft({ ...draft, preferredCurrency: e.target.value })}>{currencies.map((currency) => <option value={currency.code} key={currency.code}>{currency.code} — {currency.label}</option>)}</select></label>
               <label>Annual budget ({draft.preferredCurrency})<input type="number" step="1000" value={bdtToPreferred(draft.annualBudgetBdt, draft.preferredCurrency)} onChange={(e) => setDraft({ ...draft, annualBudgetBdt: preferredToBdt(Number(e.target.value), draft.preferredCurrency) })} /></label>
@@ -240,11 +259,16 @@ function Onboarding({ profile, onComplete }: { profile: UserProfile, onComplete:
               <label>English test<select value={draft.ieltsStatus} onChange={(e) => setDraft({ ...draft, ieltsStatus: e.target.value as UserProfile['ieltsStatus'] })}><option value="planning">Planning IELTS</option><option value="completed">IELTS completed</option><option value="not-planned">Not planned</option></select></label>
               <label>Interface language<select value={draft.interfaceLanguage} onChange={(e) => setDraft({ ...draft, interfaceLanguage: e.target.value as UserProfile['interfaceLanguage'] })}><option value="en">English</option><option value="bn">বাংলা</option></select></label>
               <label>Timezone<select value={draft.timezone} onChange={(e) => setDraft({ ...draft, timezone: e.target.value })}>{timezones.map((timezone) => <option key={timezone}>{timezone}</option>)}</select></label>
-            </div>
+            </div> : <div className="career-onboarding-preferences">
+              <div className="field-grid"><Autocomplete label="Current country" value={draft.country} options={countries} onChange={(country) => setDraft({ ...draft, country })} placeholder="Current country" /><label>Target timeline<select value={careerDraft.targetTimeline} onChange={(event) => setCareerDraft({ ...careerDraft, targetTimeline: event.target.value as CareerProfile['targetTimeline'] })}><option value="3-months">Within 3 months</option><option value="6-months">Within 6 months</option><option value="12-months">Within 12 months</option><option value="exploring">Still exploring</option></select></label><label>Interface language<select value={draft.interfaceLanguage} onChange={(e) => setDraft({ ...draft, interfaceLanguage: e.target.value as UserProfile['interfaceLanguage'] })}><option value="en">English</option><option value="bn">বাংলা</option></select></label><label>Timezone<select value={draft.timezone} onChange={(e) => setDraft({ ...draft, timezone: e.target.value })}>{timezones.map((timezone) => <option key={timezone}>{timezone}</option>)}</select></label></div>
+              <CareerChoiceGroup title="Preferred work style" options={['Analytical work', 'Deep technical work', 'Cross-team collaboration', 'Client-facing work', 'Human-centered work', 'Continuous learning', 'Technology products', 'Research']} values={careerDraft.workStyle} onToggle={(value) => toggleCareerValue('workStyle', value)} />
+              <CareerChoiceGroup title="Career interests" options={['Data and insights', 'Technology products', 'Business strategy', 'AI systems', 'People and behavior', 'Design and research']} values={careerDraft.interests} onToggle={(value) => toggleCareerValue('interests', value)} />
+              <CareerChoiceGroup title="Current skills" options={['Python', 'SQL', 'Excel', 'Statistics', 'Data visualization', 'Machine learning', 'Software engineering', 'Presentation', 'Stakeholder communication', 'Research design']} values={careerDraft.currentSkills} onToggle={(value) => toggleCareerValue('currentSkills', value)} />
+            </div>}
           </>}
           <div className="onboarding-actions">
-            <button className="text-button" disabled={step === 1} onClick={() => setStep((value) => value - 1)}>← Back</button>
-            <button className="primary" onClick={() => step < 3 ? setStep((value) => value + 1) : onComplete(draft)}>
+            <button className="text-button" onClick={() => step === 1 ? onExit() : setStep((value) => value - 1)}>← Back</button>
+            <button className="primary" onClick={() => step < 3 ? setStep((value) => value + 1) : onComplete(draft, careerDraft)}>
               {step < 3 ? 'Continue' : 'Build my roadmap'} →
             </button>
           </div>
@@ -385,7 +409,7 @@ function Dashboard({ setView, openProgram, savedIds, compareIds, toggleSaved, to
           <div className="readiness"><div className="large-ring" style={{ background: `conic-gradient(#79d9cc 0 ${serviceContent.readiness}%,rgba(255,255,255,.16) ${serviceContent.readiness}%)` }}><span>{serviceContent.readiness}%</span></div><div><strong>{serviceContent.label}</strong><small>Calculated from saved progress</small></div></div>
         </section>
 
-        <div className="service-tabs">{services.active.map((service) => <button className={services.selected === service ? 'active' : ''} onClick={() => onSelectService(service)} key={service}><span>{serviceMeta[service].icon}</span><div><strong>{serviceMeta[service].label}</strong><small>{serviceMeta[service].description}</small></div></button>)}{Object.keys(serviceMeta).filter((service) => !services.active.includes(service as ServiceType)).map((service) => <button className="add-service" onClick={() => onAddService(service as ServiceType)} key={service}><span>+</span><div><strong>Add {serviceMeta[service as ServiceType].label}</strong><small>{services.active.length}/{plan.limits.activeGoals} active-service limit</small></div></button>)}</div>
+        <div className="service-tabs">{services.active.map((service) => <button className={services.selected === service ? 'active' : ''} onClick={() => onSelectService(service)} key={service}><span>{serviceMeta[service].icon}</span><div><strong>{serviceMeta[service].label}</strong><small>{serviceMeta[service].description}</small></div></button>)}{!services.active.includes('study') && <button className="add-service" onClick={() => onAddService('study')}><span>+</span><div><strong>Add Study Abroad</strong><small>{planningTrackCount(services.active)}/{plan.limits.activeGoals} planning-track limit</small></div></button>}{!services.active.some((service) => careerBundle.includes(service)) && <button className="add-service" onClick={() => onAddService('career')}><span>+</span><div><strong>Add Career Planning</strong><small>Includes career, preparation and job search</small></div></button>}</div>
 
         <div className="stat-grid">
           <div className="stat-card"><span className="stat-icon blue">✦</span><div><strong>{services.selected === 'study' ? programs.filter((program) => scores[program.id].overall >= 75).length : services.selected === 'career' ? career.targetRoleIds.length : services.selected === 'job-preparation' ? Object.values(preparation.cvSections).filter(Boolean).length : jobs.length}</strong><small>{services.selected === 'study' ? 'Strong programme matches' : services.selected === 'career' ? 'Target career roles' : services.selected === 'job-preparation' ? 'CV sections ready' : 'Matched opportunities'}</small></div><em>Dynamic</em></div>
@@ -426,6 +450,7 @@ function Explore({ openProgram, savedIds, compareIds, toggleSaved, toggleCompare
   plan: SubscriptionPlan
 }) {
   const [country, setCountry] = useState('All countries')
+  const [insightCountry, setInsightCountry] = useState(profile.preferredCountries.find((item) => destinationInsights.some((insight) => insight.country === item)) ?? 'Germany')
   const [query, setQuery] = useState('')
   const filtered = useMemo(() => programs.filter((program) =>
     (country === 'All countries' || program.country === country) &&
@@ -439,14 +464,27 @@ function Explore({ openProgram, savedIds, compareIds, toggleSaved, toggleCompare
           <div className="search-box"><span>⌕</span><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search programs or universities" /></div>
         </section>
         <div className="filter-bar">
-          <div>{['All countries', 'Germany', 'Finland', 'Netherlands'].map((item) => <button className={country === item ? 'active' : ''} onClick={() => setCountry(item)} key={item}>{item}</button>)}</div>
+          <div>{['All countries', 'Germany', 'Finland', 'Netherlands'].map((item) => <button className={country === item ? 'active' : ''} onClick={() => { setCountry(item); if (item !== 'All countries') setInsightCountry(item) }} key={item}>{item}</button>)}</div>
           <span>{filtered.length} programs · {compareIds.length}/3 selected</span>
         </div>
         {compareIds.length >= 2 && <div className="compare-banner"><span><strong>{compareIds.length} programs selected.</strong> See their cost, match and funding side by side.</span><button onClick={openCompare}>Compare now →</button></div>}
         <div className="program-grid wide-grid">{filtered.map((program) => <ProgramCard key={program.id} program={program} score={scores[program.id]} profile={profile} onOpen={() => openProgram(program)} saved={savedIds.includes(program.id)} compared={compareIds.includes(program.id)} saveDisabled={savedIds.length >= plan.limits.shortlist} compareDisabled={compareIds.length >= plan.limits.comparisons} onSave={() => toggleSaved(program.id)} onCompare={() => toggleCompare(program.id)} />)}</div>
+        <DestinationInsights country={insightCountry} onCountryChange={setInsightCountry} />
       </div>
     </>
   )
+}
+
+function DestinationInsights({ country, onCountryChange }: { country: string, onCountryChange: (country: string) => void }) {
+  const insight = destinationInsights.find((item) => item.country === country) ?? destinationInsights[0]
+  const [city, setCity] = useState(Object.keys(insight.cities)[0])
+  const cityNames = Object.keys(insight.cities)
+  const selectedCity = cityNames.includes(city) ? city : cityNames[0]
+  const cityData = insight.cities[selectedCity as keyof typeof insight.cities] as { livingUsd: string, salary: string, partTime: string }
+  return <section className="destination-insights"><div className="section-title"><div><span className="eyebrow">Destination reality check</span><h2>Living, working and career context</h2></div><div className="destination-selectors"><select value={insight.country} onChange={(event) => { const next = destinationInsights.find((item) => item.country === event.target.value); setCity(next ? Object.keys(next.cities)[0] : ''); onCountryChange(event.target.value) }}>{destinationInsights.map((item) => <option key={item.country}>{item.country}</option>)}</select><select value={selectedCity} onChange={(event) => setCity(event.target.value)}>{cityNames.map((item) => <option key={item}>{item}</option>)}</select></div></div>
+    <div className="destination-metrics"><article><small>Estimated living cost</small><strong>{cityData.livingUsd}</strong></article><article><small>Graduate salary context</small><strong>{cityData.salary}</strong></article><article><small>Part-time opportunity</small><p>{cityData.partTime}</p></article></div>
+    <div className="destination-detail-grid"><article><h3>Student job rules</h3><p>{insight.workRules}</p><small>Prototype summary—always verify current immigration and employment rules officially.</small></article><article><h3>Common job options</h3><div className="career-tags">{insight.jobOptions.map((item) => <span key={item}>{item}</span>)}</div></article><article><h3>Pros</h3>{insight.pros.map((item) => <p key={item}>✓ {item}</p>)}</article><article><h3>Cons</h3>{insight.cons.map((item) => <p key={item}>– {item}</p>)}</article></div>
+  </section>
 }
 
 function Shortlist({ savedIds, compareIds, openProgram, toggleSaved, toggleCompare, scores, profile, plan }: {
@@ -565,6 +603,8 @@ const adviserReplies = [
 
 function Adviser({ plan, subscription, setSubscription, openPlans, activeService, profile }: { plan: SubscriptionPlan, subscription: SubscriptionState, setSubscription: React.Dispatch<React.SetStateAction<SubscriptionState>>, openPlans: () => void, activeService: ServiceType, profile: UserProfile }) {
   const [input, setInput] = useState('')
+  const [isTyping, setIsTyping] = useState(false)
+  const messageCounter = useRef(2)
   const [messages, setMessages] = usePersistentState<ChatMessage[]>('navigator-chat', [{
     id: 1,
     role: 'assistant',
@@ -586,7 +626,14 @@ function Adviser({ plan, subscription, setSubscription, openPlans, activeService
       'job-preparation': { text: 'Strengthen the weakest of CV evidence, portfolio proof or interview practice before starting a larger application push.', sources: ['Job Preparation', 'Readiness scores'] },
       'job-search': { text: 'Review tracked opportunities, progress one next action, and remove roles that no longer fit your target direction.', sources: ['Job Search', 'Application tracker'] },
     }[activeService])
-    setMessages((current) => [...current, { id: Date.now(), role: 'user', text }, { id: Date.now() + 1, role: 'assistant', text: response.text, sources: response.sources }])
+    const messageId = messageCounter.current
+    messageCounter.current += 2
+    setMessages((current) => [...current, { id: messageId, role: 'user', text }])
+    setIsTyping(true)
+    window.setTimeout(() => {
+      setMessages((current) => [...current, { id: messageId + 1, role: 'assistant', text: response.text, sources: response.sources }])
+      setIsTyping(false)
+    }, 450)
     setSubscription((current) => ({ ...current, usage: { ...current.usage, adviserMessages: current.usage.adviserMessages + 1 } }))
     setInput('')
   }
@@ -602,12 +649,13 @@ function Adviser({ plan, subscription, setSubscription, openPlans, activeService
       <Topbar title="Ask Navigator" />
       <div className="page-content adviser-page">
         <section className="chat-shell">
-          <div className="chat-header"><div className="navigator-orb">N</div><div><span className="eyebrow">Mock AI adviser · {serviceMeta[activeService].label}</span><h2>Navigator</h2><p>Answers from your active service and prototype data—not live AI yet.</p></div><span className="online-pill">{subscription.usage.adviserMessages}/{plan.limits.adviserMessages} used</span></div>
+          <div className="chat-header"><div className="navigator-orb">N</div><div><span className="eyebrow">Mock AI adviser · {serviceMeta[activeService].label}</span><h2>Navigator</h2><p>Ask follow-ups, use suggested prompts, and receive answers grounded in your active plan.</p></div><div className="chat-header-actions"><span className="online-pill">{subscription.usage.adviserMessages}/{plan.limits.adviserMessages} used</span><button onClick={() => setMessages([])}>Clear chat</button></div></div>
+          <div className="chat-context-strip"><span>{serviceMeta[activeService].icon}</span><div><strong>Current planning context</strong><small>{serviceMeta[activeService].description} · {profile.fullName}</small></div></div>
           <div className="suggestion-row">{suggestions[activeService].map((question) => <button onClick={() => send(question)} key={question}>{question}</button>)}</div>
           <div className="messages">
-            {messages.map((message) => <div className={`message ${message.role}`} key={message.id}><div>{message.text}</div>{message.sources && <small>Based on: {message.sources.join(' · ')}</small>}</div>)}
+            {messages.map((message) => <div className={`message ${message.role}`} key={message.id}><div>{message.text}</div>{message.sources && <small>Based on: {message.sources.join(' · ')}</small>}</div>)}{isTyping && <div className="message assistant typing-message"><div><span /><span /><span /></div><small>Navigator is reviewing your plan…</small></div>}
           </div>
-          <div className="chat-input"><input value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') send() }} placeholder="Ask about your options or next step…" /><button onClick={() => send()}>Send →</button></div>
+          <div className="chat-input"><input value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !isTyping) send() }} placeholder={`Ask about ${serviceMeta[activeService].label.toLowerCase()}…`} /><button disabled={isTyping} onClick={() => send()}>Send →</button></div>
         </section>
       </div>
     </>
@@ -623,6 +671,7 @@ const gatedFeatureLabels: Record<GatedFeature, string> = {
   careerPlan: 'Career planning workspace',
   jobPreparation: 'Job preparation workspace',
   jobSearch: 'Job search and application tracking',
+  premiumCv: 'Premium CV maker',
   shortlist: 'Shortlist and comparison',
   scholarships: 'Scholarship matching',
   roadmap: 'Personal roadmap',
@@ -924,13 +973,15 @@ function CareerChoiceGroup({ title, options, values, onToggle }: { title: string
   return <div className="career-choice-group"><strong>{title}</strong><div>{options.map((option) => <button className={values.includes(option) ? 'selected' : ''} onClick={() => onToggle(option)} key={option}>{values.includes(option) ? '✓ ' : '+ '}{option}</button>)}</div></div>
 }
 
-function JobPreparation({ career, preparation, setPreparation, documents, openDocuments, openExperts }: {
+function JobPreparation({ career, preparation, setPreparation, documents, openDocuments, openExperts, premiumCv, onUpgrade }: {
   career: CareerProfile
   preparation: JobPreparationProfile
   setPreparation: React.Dispatch<React.SetStateAction<JobPreparationProfile>>
   documents: UserDocument[]
   openDocuments: () => void
   openExperts: () => void
+  premiumCv: boolean
+  onUpgrade: () => void
 }) {
   const [newPortfolioTitle, setNewPortfolioTitle] = useState('')
   const [activePrompt, setActivePrompt] = useState(0)
@@ -948,6 +999,14 @@ function JobPreparation({ career, preparation, setPreparation, documents, openDo
   const interviewScore = Math.min(100, Math.round(preparation.interviewConfidence * .65 + preparation.practiceSessions * 12))
   const taskScore = Math.round(preparation.completedTasks.length / jobPreparationTasks.length * 100)
   const overall = Math.round(cvScore * .3 + portfolioScore * .25 + interviewScore * .25 + taskScore * .2)
+  const cvAnalysis = [
+    { label: 'Role-specific headline', ready: preparation.cvDraft.headline.toLowerCase().includes(targetRole.title.toLowerCase()) },
+    { label: 'Focused professional summary', ready: preparation.cvDraft.summary.trim().length >= 80 },
+    { label: 'Evidence-based experience', ready: /\d|%|increased|reduced|improved|built/i.test(preparation.cvDraft.experience) },
+    { label: 'Relevant project evidence', ready: preparation.cvDraft.projects.trim().length >= 60 },
+    { label: 'Target-role keywords', ready: targetRole.coreSkills.some((skill) => preparation.cvDraft.skills.toLowerCase().includes(skill.toLowerCase())) },
+  ]
+  const cvAnalysisScore = Math.round(cvAnalysis.filter((item) => item.ready).length / cvAnalysis.length * 100)
 
   const toggleCvSection = (section: keyof JobPreparationProfile['cvSections']) => setPreparation((current) => ({
     ...current,
@@ -996,6 +1055,18 @@ function JobPreparation({ career, preparation, setPreparation, documents, openDo
             <div className="document-connection"><div><strong>{cvDocument?.files.length ?? 0} CV file(s) connected</strong><small>Document center status: {cvDocument?.status ?? 'missing'}</small></div><button className="secondary" onClick={openDocuments}>Open document center</button></div>
           </section>
 
+          <section className="panel cv-analysis-maker">
+            <div className="section-title"><div><span className="eyebrow">CV analysis</span><h2>{cvAnalysisScore}% positioning strength</h2></div>{premiumCv ? <span className="verified">Premium maker enabled</span> : <button className="locked-inline" onClick={onUpgrade}>⌁ Premium CV maker · {minimumPlanName('premiumCv')}</button>}</div>
+            <div className="cv-analysis-grid"><div>{cvAnalysis.map((item) => <p className={item.ready ? 'ready' : ''} key={item.label}><span>{item.ready ? '✓' : '!'}</span>{item.label}</p>)}</div><div className={`cv-maker-fields ${premiumCv ? '' : 'locked-maker'}`}>
+              <label>Professional headline<input disabled={!premiumCv} value={preparation.cvDraft.headline} onChange={(event) => setPreparation((current) => ({ ...current, cvDraft: { ...current.cvDraft, headline: event.target.value } }))} /></label>
+              <label>Professional summary<textarea disabled={!premiumCv} value={preparation.cvDraft.summary} onChange={(event) => setPreparation((current) => ({ ...current, cvDraft: { ...current.cvDraft, summary: event.target.value } }))} /></label>
+              <label>Experience evidence<textarea disabled={!premiumCv} value={preparation.cvDraft.experience} onChange={(event) => setPreparation((current) => ({ ...current, cvDraft: { ...current.cvDraft, experience: event.target.value } }))} /></label>
+              <label>Projects<textarea disabled={!premiumCv} value={preparation.cvDraft.projects} onChange={(event) => setPreparation((current) => ({ ...current, cvDraft: { ...current.cvDraft, projects: event.target.value } }))} /></label>
+              <label>Skills<input disabled={!premiumCv} value={preparation.cvDraft.skills} onChange={(event) => setPreparation((current) => ({ ...current, cvDraft: { ...current.cvDraft, skills: event.target.value } }))} /></label>
+              {premiumCv && <button className="primary" onClick={() => setToast('Premium CV draft saved in this browser.')}>Save CV draft</button>}
+            </div></div>
+          </section>
+
           <section className="panel portfolio-builder">
             <div className="section-title"><div><span className="eyebrow">Portfolio and proof</span><h2>Evidence employers can inspect</h2></div><span className="verified">{readyPortfolioItems} ready</span></div>
             <div className="portfolio-add"><input value={newPortfolioTitle} onChange={(event) => setNewPortfolioTitle(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') addPortfolio() }} placeholder="Add a project or case study" /><button className="primary" onClick={addPortfolio}>Add evidence</button></div>
@@ -1022,9 +1093,11 @@ function JobPreparation({ career, preparation, setPreparation, documents, openDo
   </>
 }
 
-function JobSearch({ career, preparation, applications, setApplications }: {
+function JobSearch({ profile, career, preparation, documents, applications, setApplications }: {
+  profile: UserProfile
   career: CareerProfile
   preparation: JobPreparationProfile
+  documents: UserDocument[]
   applications: JobApplication[]
   setApplications: React.Dispatch<React.SetStateAction<JobApplication[]>>
 }) {
@@ -1048,9 +1121,12 @@ function JobSearch({ career, preparation, applications, setApplications }: {
       <div className="job-search-layout">
         <main className="job-listings">{matched.length ? matched.map((job) => {
           const tracked = applications.find((item) => item.jobId === job.id)
+          const skillFit = job.skills.filter((skill) => career.currentSkills.some((current) => current.toLowerCase() === skill.toLowerCase())).length / job.skills.length
           const role = careerRoles.find((item) => item.id === job.roleId)
-          const skillFit = Math.round(job.skills.filter((skill) => career.currentSkills.includes(skill)).length / job.skills.length * 100)
-          return <article key={job.id}><div className="job-company-mark" style={{ background: role?.accent }}>{job.company.split(' ').map((word) => word[0]).slice(0, 2).join('')}</div><div className="job-listing-copy"><span>{job.company} · {job.location}</span><h3>{job.title}</h3><div><em>{job.workMode}</em><em>{job.level}</em><em>{job.salaryUsd}</em></div><p>{job.skills.join(' · ')}</p><small>Deadline {job.deadline} · {skillFit}% current skill coverage</small></div><button className={tracked ? 'secondary' : 'primary'} onClick={() => track(job.id)} disabled={Boolean(tracked)}>{tracked ? 'Tracked' : 'Track application'}</button></article>
+          const educationFit = role?.relatedBackgrounds.some((background) => `${profile.currentDegree} ${profile.subject}`.toLowerCase().includes(background.toLowerCase())) ? 1 : .55
+          const evidenceFit = Math.min(1, (preparation.portfolioItems.filter((item) => item.status === 'ready').length * .35) + (documents.find((item) => item.id === 'cv')?.status === 'verified' ? .35 : documents.find((item) => item.id === 'cv')?.status === 'uploaded' ? .2 : 0) + preparation.completedTasks.length / jobPreparationTasks.length * .3)
+          const matchingRate = Math.round(skillFit * 50 + educationFit * 20 + evidenceFit * 30)
+          return <article key={job.id}><div className="job-company-mark" style={{ background: role?.accent }}>{job.company.split(' ').map((word) => word[0]).slice(0, 2).join('')}</div><div className="job-listing-copy"><span>{job.company} · {job.location}</span><h3>{job.title}</h3><div><em>{job.workMode}</em><em>{job.level}</em><em>{job.salaryUsd}</em><em className="match-em">{matchingRate}% match</em></div><p>{job.skills.join(' · ')}</p><small>Match uses skills, education, portfolio, CV and preparation progress.</small></div><button className={tracked ? 'secondary' : 'primary'} onClick={() => track(job.id)} disabled={Boolean(tracked)}>{tracked ? 'Tracked' : 'Track application'}</button></article>
         }) : <EmptyState title="No roles match these filters" text="Try another work mode or broaden the search words." />}</main>
         <aside className="panel job-application-tracker"><div className="section-title"><div><span className="eyebrow">Application tracker</span><h2>{applications.length} active roles</h2></div></div>{applications.length ? applications.map((application) => {
           const job = jobs.find((item) => item.id === application.jobId)
@@ -1219,7 +1295,7 @@ function Subscription({ profile, subscription, setSubscription, savedCount, docu
     { label: 'Saved programmes', used: savedCount, limit: currentPlan.limits.shortlist },
     { label: 'Document folders', used: documentFolderCount, limit: currentPlan.limits.documentFolders },
     { label: 'Expert credits', used: Math.max(0, currentPlan.limits.expertCredits - subscription.usage.expertCredits), limit: currentPlan.limits.expertCredits },
-    { label: 'Active services', used: activeGoalCount, limit: currentPlan.limits.activeGoals },
+    { label: 'Active planning tracks', used: activeGoalCount, limit: currentPlan.limits.activeGoals },
   ]
   const applyPlan = () => {
     if (!pendingPlan) return
@@ -1263,7 +1339,7 @@ function Subscription({ profile, subscription, setSubscription, savedCount, docu
             <div className="plan-card-heading"><div><span className="eyebrow">{current ? 'Your plan' : plan.name}</span><h3>{plan.name}</h3></div>{current && <span className="current-check">✓</span>}</div>
             <p>{plan.tagline}</p><div className="plan-card-price"><strong>{price === 0 ? 'Free' : formatUsd(price, profile)}</strong><span>{price === 0 ? 'No payment' : billingCycle === 'annual' ? '/ year' : '/ month'}</span></div>
             <ul>{plan.features.map((feature) => <li key={feature}>✓ {feature}</li>)}</ul>
-            <div className="plan-limits"><span>{plan.limits.activeGoals} active service(s)</span><span>{plan.limits.shortlist >= 999 ? 'Unlimited' : plan.limits.shortlist} saved programmes</span><span>{plan.limits.adviserMessages} adviser messages</span><span>{plan.limits.expertCredits} expert credit(s)</span></div>
+            <div className="plan-limits"><span>{plan.limits.activeGoals} active planning track(s)</span><span>{plan.limits.shortlist >= 999 ? 'Unlimited' : plan.limits.shortlist} saved programmes</span><span>{plan.limits.adviserMessages} adviser messages</span><span>{plan.limits.expertCredits} expert credit(s)</span></div>
             <button className={current ? 'secondary wide' : 'primary wide'} disabled={current} onClick={() => setPendingPlan(plan)}>{current ? 'Current plan' : plan.monthlyUsd > currentPlan.monthlyUsd ? 'Upgrade plan' : 'Change plan'}</button>
           </article>
         })}</section>
@@ -1477,7 +1553,7 @@ function App() {
   const [jobPreparation, setJobPreparation] = usePersistentState<JobPreparationProfile>('navigator-job-preparation', defaultJobPreparationProfile)
   const [jobApplications, setJobApplications] = usePersistentState<JobApplication[]>('navigator-job-applications', defaultJobApplications)
   const initialService = serviceFromGoal(profile.goal)
-  const [services, setServices] = usePersistentState<ServiceState>('navigator-services', { active: [initialService], selected: initialService })
+  const [services, setServices] = usePersistentState<ServiceState>('navigator-services', { active: servicesForGoal(profile.goal), selected: initialService })
   const [bookings, setBookings] = usePersistentState<ConsultationBooking[]>('navigator-consultations', [])
   const [subscription, setSubscription] = usePersistentState<SubscriptionState>('navigator-subscription', {
     planId: 'essential',
@@ -1504,19 +1580,21 @@ function App() {
   const currentPlan = plans.find((plan) => plan.id === subscription.planId) ?? plans[1]
   useEffect(() => {
     setServices((current) => {
-      if (current.active.length <= currentPlan.limits.activeGoals) return current
-      const active = current.active.slice(0, currentPlan.limits.activeGoals)
+      if (planningTrackCount(current.active) <= currentPlan.limits.activeGoals) return current
+      const selectedTrack: ServiceType[] = current.selected === 'study' ? ['study'] : careerBundle
+      const active = selectedTrack.slice()
       return { active, selected: active.includes(current.selected) ? current.selected : active[0] }
     })
   }, [currentPlan.limits.activeGoals, setServices])
 
   if (!authenticated) return <AuthScreen onAuthenticated={(isNew) => { setAuthenticated(true); if (isNew) setOnboarded(false) }} />
-  if (!onboarded) return <Onboarding profile={profile} onComplete={(updatedProfile) => {
+  if (!onboarded) return <Onboarding profile={profile} career={careerProfile} onExit={() => { localStorage.removeItem('navigator-session'); setAuthenticated(false) }} onComplete={(updatedProfile, updatedCareer) => {
     const session = JSON.parse(localStorage.getItem('navigator-session') || '{}') as { name?: string }
     const completedProfile = session.name && session.name !== 'Samira Rahman' ? { ...updatedProfile, fullName: session.name } : updatedProfile
     const selected = serviceFromGoal(completedProfile.goal)
     setProfile(completedProfile)
-    setServices({ active: [selected], selected })
+    setCareerProfile(updatedCareer)
+    setServices({ active: servicesForGoal(completedProfile.goal), selected })
     localStorage.setItem('navigator-onboarded', 'true')
     setOnboarded(true)
   }} />
@@ -1532,13 +1610,14 @@ function App() {
     setView('dashboard')
   }
   const addService = (service: ServiceType) => {
-    if (services.active.includes(service)) return selectService(service)
-    if (services.active.length >= currentPlan.limits.activeGoals) {
+    const bundle = service === 'study' ? ['study'] as ServiceType[] : careerBundle
+    if (bundle.every((item) => services.active.includes(item))) return selectService(service)
+    if (planningTrackCount(services.active) >= currentPlan.limits.activeGoals) {
       setView('subscription')
-      setAppToast(`Your ${currentPlan.name} plan supports ${currentPlan.limits.activeGoals} active service(s).`)
+      setAppToast(`Your ${currentPlan.name} plan supports ${currentPlan.limits.activeGoals} active planning track(s).`)
       return
     }
-    setServices((current) => ({ active: [...current.active, service], selected: service }))
+    setServices((current) => ({ active: [...new Set([...current.active, ...bundle])], selected: service }))
     setView('dashboard')
     setAppToast(`${serviceMeta[service].label} added to your workspace.`)
   }
@@ -1581,8 +1660,8 @@ function App() {
         {view === 'dashboard' && <Dashboard setView={setView} openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} profile={profile} scores={scores} notifications={notifications} plan={currentPlan} services={services} onSelectService={selectService} onAddService={addService} career={careerProfile} preparation={jobPreparation} jobApplications={jobApplications} />}
         {view === 'study-plan' && <StudyPlan profile={profile} documents={normalizedDocuments} savedIds={savedIds} scores={scores} applications={applications} setApplications={setApplications} setView={setView} openProgram={openProgram} />}
         {view === 'career-plan' && <CareerPlan profile={profile} career={careerProfile} setCareer={setCareerProfile} openExperts={() => setView('experts')} />}
-        {view === 'job-preparation' && <JobPreparation career={careerProfile} preparation={jobPreparation} setPreparation={setJobPreparation} documents={normalizedDocuments} openDocuments={() => setView('documents')} openExperts={() => setView('experts')} />}
-        {view === 'job-search' && <JobSearch career={careerProfile} preparation={jobPreparation} applications={jobApplications} setApplications={setJobApplications} />}
+        {view === 'job-preparation' && <JobPreparation career={careerProfile} preparation={jobPreparation} setPreparation={setJobPreparation} documents={normalizedDocuments} openDocuments={() => setView('documents')} openExperts={() => setView('experts')} premiumCv={canUseFeature(currentPlan.id, 'premiumCv')} onUpgrade={() => requestUpgrade('premiumCv')} />}
+        {view === 'job-search' && <JobSearch profile={profile} career={careerProfile} preparation={jobPreparation} documents={normalizedDocuments} applications={jobApplications} setApplications={setJobApplications} />}
         {view === 'explore' && <Explore openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} openCompare={() => setView('shortlist')} scores={scores} profile={profile} plan={currentPlan} />}
         {view === 'program' && <ProgramDetail program={selectedProgram} score={scores[selectedProgram.id]} profile={profile} goBack={() => setView('explore')} goRoadmap={() => canUseFeature(currentPlan.id, 'roadmap') ? setView('roadmap') : requestUpgrade('roadmap')} saved={savedIds.includes(selectedProgram.id)} toggleSaved={() => toggleSaved(selectedProgram.id)} advancedCosts={canUseFeature(currentPlan.id, 'advancedCosts')} onUpgrade={() => requestUpgrade('advancedCosts')} />}
         {view === 'shortlist' && <Shortlist savedIds={savedIds} compareIds={compareIds} openProgram={openProgram} toggleSaved={toggleSaved} toggleCompare={toggleCompare} scores={scores} profile={profile} plan={currentPlan} />}
@@ -1591,7 +1670,7 @@ function App() {
         {view === 'documents' && <Documents documents={normalizedDocuments} onChange={setDocuments} onProfileUpdate={(update) => { setProfile((current) => ({ ...current, ...update })); setAppToast('Profile readiness updated from document status.') }} setView={setView} plan={currentPlan} onUpgrade={requestUpgrade} />}
         {view === 'adviser' && <Adviser plan={currentPlan} subscription={subscription} setSubscription={setSubscription} openPlans={() => setView('subscription')} activeService={services.selected} profile={profile} />}
         {view === 'experts' && <Experts profile={profile} documents={normalizedDocuments} bookings={bookings} setBookings={setBookings} plan={currentPlan} subscription={subscription} setSubscription={setSubscription} activeService={services.selected} />}
-        {view === 'subscription' && <Subscription profile={profile} subscription={subscription} setSubscription={setSubscription} savedCount={savedIds.length} documentFolderCount={normalizedDocuments.length} bookingCount={bookings.length} activeGoalCount={services.active.length} />}
+        {view === 'subscription' && <Subscription profile={profile} subscription={subscription} setSubscription={setSubscription} savedCount={savedIds.length} documentFolderCount={normalizedDocuments.length} bookingCount={bookings.length} activeGoalCount={planningTrackCount(services.active)} />}
         {view === 'profile' && <><Profile profile={profile} onSave={(updated) => { setProfile(updated); setAppToast('Profile saved. Guidance has been recalculated.') }} /><div className="reset-demo-wrap"><button className="reset-demo" onClick={resetDemo}>Reset all demo data</button></div></>}
       </main>
       <nav className="mobile-nav">

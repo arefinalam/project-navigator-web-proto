@@ -16,6 +16,13 @@ export const defaultJobPreparationProfile: JobPreparationProfile = {
   interviewConfidence: 42,
   practiceSessions: 1,
   completedTasks: ['job-target', 'cv-baseline'],
+  cvDraft: {
+    headline: 'Entry-level Data Analyst',
+    summary: 'Computer Science graduate using Python, SQL and statistics to turn data into practical decisions.',
+    experience: 'Add experience with action, context and measurable result.',
+    projects: 'Customer churn analysis — built a reproducible analysis and explained retention drivers.',
+    skills: 'Python, SQL, Statistics, Data visualization',
+  },
 }
 
 export const jobPreparationTasks = [
