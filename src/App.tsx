@@ -484,6 +484,13 @@ function Dashboard({ setView, openProgram, savedIds, compareIds, toggleSaved, to
       { label: 'Target direction', value: careerRole.title, text: 'Career guidance is connected to role requirements and current skills.' },
       { label: 'Evidence readiness', value: `${cvReady}% CV ready`, text: 'Preparation focuses on proof, not only motivation.' },
     ]
+  const missingSkills = careerRole.coreSkills.filter((skill) => !career.currentSkills.includes(skill)).slice(0, 3)
+  const careerJourneyMetrics = [
+    { label: 'Current situation', value: career.experienceLevel === 'entry' ? 'Unemployed / entry-level' : career.experienceLevel, detail: 'Used to set urgency and guidance depth.' },
+    { label: 'Target role', value: careerRole.title, detail: `${careerRole.demand} demand · ${careerRole.salaryUsd} global salary context.` },
+    { label: 'Skill gaps', value: missingSkills.length ? missingSkills.join(', ') : 'Core skills mapped', detail: 'The platform converts gaps into weekly tasks.' },
+    { label: 'Application momentum', value: `${jobApplications.length} tracked`, detail: 'Every opportunity gets a next action and status.' },
+  ]
   return (
     <>
       <Topbar title="Overview" notifications={notifications} onNotification={(item) => setView(item.action)} />
@@ -532,6 +539,22 @@ function Dashboard({ setView, openProgram, savedIds, compareIds, toggleSaved, to
             </article>)}
           </div>
         </section>
+
+        {services.selected !== 'study' && <section className="career-demo-story">
+          <div className="story-copy">
+            <span className="eyebrow">Unemployment to job-ready journey</span>
+            <h2>Rahim does not just need motivation. He needs a weekly system.</h2>
+            <p>The career workspace turns a broad problem — “I need a job” — into target role selection, skill gap tasks, CV evidence, interview practice and application follow-up.</p>
+            <div className="story-actions"><button className="primary" onClick={() => setView('career-plan')}>Review career plan</button><button className="secondary" onClick={() => setView('job-preparation')}>Improve CV readiness</button><button className="secondary" onClick={() => setView('job-search')}>Track applications</button></div>
+          </div>
+          <div className="career-metric-grid">
+            {careerJourneyMetrics.map((item) => <article key={item.label}>
+              <small>{item.label}</small>
+              <strong>{item.value}</strong>
+              <p>{item.detail}</p>
+            </article>)}
+          </div>
+        </section>}
 
         <div className="dashboard-grid">
           <section className="panel next-action">
