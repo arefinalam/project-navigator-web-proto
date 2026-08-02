@@ -19,6 +19,18 @@ import heroImage from './assets/hero.png'
 import './App.css'
 
 type AuthMode = 'login' | 'signup'
+type DemoPersonaId = 'samira' | 'rahim' | 'nadia'
+type SuccessStory = {
+  person: string
+  initials: string
+  avatar: string
+  background: string
+  goal: string
+  review: string
+  score: string
+  metrics: string[]
+  journey: string[]
+}
 
 const programs = programsData as Program[]
 const initialRoadmap = roadmapData as RoadmapItem[]
@@ -130,6 +142,7 @@ export function PublicLanding({ onStart, onDemo }: { onStart: () => void, onDemo
 }
 
 function InvestorLanding({ onStart, onDemo }: { onStart: () => void, onDemo: () => void }) {
+  const [selectedJourney, setSelectedJourney] = useState<SuccessStory | null>(null)
   const services = [
     { title: 'Study abroad', text: 'Country, university, scholarship, cost and application roadmap.', metric: 'Program fit + funding pressure', icon: '01' },
     { title: 'Career planning', text: 'Role direction, skill gap, evidence building and expert review.', metric: 'Career readiness score', icon: '02' },
@@ -142,9 +155,29 @@ function InvestorLanding({ onStart, onDemo }: { onStart: () => void, onDemo: () 
     ['Readiness data', 'Roadmap progress, missing documents, risk flags and next actions'],
     ['Expert data', 'Review notes, consultation history and recommended corrections'],
   ]
-  const journeys = [
-    { person: 'Samira', goal: 'MSc Data Science abroad', outcome: 'Finds 3 strong programs, sees a funding gap, and starts IELTS plus scholarship tasks.', score: '74% study ready' },
-    { person: 'Rahim', goal: 'Unemployed graduate', outcome: 'Chooses a target role, improves CV evidence, and tracks job applications weekly.', score: '61% job ready' },
+  const successStories: SuccessStory[] = [
+    {
+      person: 'Samira Rahman',
+      initials: 'SR',
+      avatar: 'linear-gradient(145deg,#3159d9,#80ddd1)',
+      background: 'BSc CS graduate · Dhaka',
+      goal: 'MSc Data Science abroad',
+      review: 'Before Navigator, I was confused about countries, scholarships and deadlines. Now I can see my best-fit programs, funding gap and next documents clearly.',
+      score: '74% study ready',
+      metrics: ['3 strong program matches', 'Scholarship gap identified', 'IELTS roadmap created'],
+      journey: ['Created academic and budget profile', 'Selected MSc Data Science as target', 'Compared Germany, Finland and Netherlands', 'Reviewed university and scholarship matches', 'Detected funding and IELTS readiness gaps', 'Built roadmap for documents, tests and applications', 'Prepared for expert review before submission'],
+    },
+    {
+      person: 'Rahim Ahmed',
+      initials: 'RA',
+      avatar: 'linear-gradient(145deg,#59467f,#1b756d)',
+      background: 'Unemployed graduate · Bangladesh',
+      goal: 'Junior Data Analyst role',
+      review: 'I did not know what to prepare first. Navigator helped me choose a target role, find skill gaps, improve my CV evidence and track applications.',
+      score: '61% job ready',
+      metrics: ['Target role selected', 'CV gaps visible', 'Application tracker started'],
+      journey: ['Started as entry-level unemployed graduate', 'Completed career baseline', 'Selected Data Analyst and Business Analyst paths', 'Found skill gaps in SQL, visualization and portfolio evidence', 'Created CV improvement checklist', 'Added a sales dashboard portfolio project', 'Practiced interview prompts and tracked applications'],
+    },
   ]
 
   return <main className="landing-page">
@@ -167,6 +200,10 @@ function InvestorLanding({ onStart, onDemo }: { onStart: () => void, onDemo: () 
 
     <section className="landing-proof"><span>One connected workspace for</span><div><strong>Programme discovery</strong><strong>Career readiness</strong><strong>Document tracking</strong><strong>Expert review</strong></div></section>
 
+    <section className="landing-gallery" aria-label="Project Navigator use cases">
+      {[['Students planning abroad', 'Compare countries, programs and scholarships'], ['Career switchers', 'Find direction and build evidence'], ['Job seekers', 'Prepare CV, interviews and applications']].map(([title, text], index) => <article className={`gallery-card gallery-${index + 1}`} key={title}><div><span>{index + 1}</span><strong>{title}</strong><small>{text}</small></div></article>)}
+    </section>
+
     <section className="landing-section about-panel" id="about"><div><span className="eyebrow">About us</span><h2>Built like a patient mentor, powered like an analytical engine.</h2><p>Many students and job seekers do not fail because they lack ambition. They get stuck because the path is scattered: advice in one place, documents in another, deadlines somewhere else. Project Navigator brings the full journey into one calm workspace.</p></div><div className="about-values"><article><strong>Warm guidance</strong><span>Simple language, clear next steps, less overwhelm.</span></article><article><strong>Data awareness</strong><span>Every suggestion is connected to profile, cost, readiness or opportunity signals.</span></article><article><strong>Human backup</strong><span>Experts can review the case when automation is not enough.</span></article></div></section>
 
     <section className="landing-section landing-services" id="services"><span className="eyebrow">Services</span><h2>Start with one goal. Expand when the user needs more guidance.</h2><div className="service-showcase">{services.map((service) => <article key={service.title}><span>{service.icon}</span><h3>{service.title}</h3><p>{service.text}</p><small>{service.metric}</small></article>)}</div></section>
@@ -175,7 +212,18 @@ function InvestorLanding({ onStart, onDemo }: { onStart: () => void, onDemo: () 
 
     <section className="landing-section landing-data" id="data-engine"><div><span className="eyebrow light">Data-driven guidance</span><h2>Not only advice. A decision system.</h2><p>The prototype shows how user data, market data and progress data can combine into clear recommendations. In the full product, these sources can be synced through APIs, partners and verified manual datasets.</p><button className="primary" onClick={onDemo}>Open data-based demo</button></div><div className="data-signal-grid">{dataSignals.map(([title, text]) => <article key={title}><strong>{title}</strong><p>{text}</p></article>)}</div></section>
 
-    <section className="landing-section landing-journeys" id="journeys"><span className="eyebrow">Sample journeys</span><h2>Show outcomes, not just features.</h2><div className="journey-grid">{journeys.map((journey) => <article key={journey.person}><div><strong>{journey.person}</strong><span>{journey.score}</span></div><h3>{journey.goal}</h3><p>{journey.outcome}</p><button className="text-button" onClick={onDemo}>View demo journey -&gt;</button></article>)}</div></section>
+    <section className="landing-section landing-journeys" id="journeys"><span className="eyebrow">Benefited users</span><h2>Realistic stories that show what the platform changes.</h2><div className="journey-grid success-story-grid">{successStories.map((story) => <article className="success-story-card" key={story.person}><div className="story-user"><span className="story-avatar" style={{ background: story.avatar }}>{story.initials}</span><div><strong>{story.person}</strong><small>{story.background}</small></div><em>{story.score}</em></div><h3>{story.goal}</h3><p>“{story.review}”</p><div className="story-metrics">{story.metrics.map((metric) => <span key={metric}>{metric}</span>)}</div><button className="primary wide" onClick={() => setSelectedJourney(story)}>View full journey</button></article>)}</div></section>
+
+    {selectedJourney && <section className="journey-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="journey-title">
+      <div className="journey-modal">
+        <button className="modal-close" onClick={() => setSelectedJourney(null)} aria-label="Close journey">×</button>
+        <div className="journey-modal-head"><span className="story-avatar large" style={{ background: selectedJourney.avatar }}>{selectedJourney.initials}</span><div><span className="eyebrow">User journey</span><h2 id="journey-title">{selectedJourney.person}</h2><p>{selectedJourney.background} · {selectedJourney.goal}</p></div></div>
+        <blockquote>“{selectedJourney.review}”</blockquote>
+        <div className="journey-modal-metrics">{selectedJourney.metrics.map((metric) => <article key={metric}><small>Outcome</small><strong>{metric}</strong></article>)}</div>
+        <div className="journey-timeline">{selectedJourney.journey.map((step, index) => <article key={step}><span>{String(index + 1).padStart(2, '0')}</span><p>{step}</p></article>)}</div>
+        <div className="journey-modal-actions"><button className="secondary" onClick={() => setSelectedJourney(null)}>Close</button><button className="primary" onClick={onDemo}>Explore working demo</button></div>
+      </div>
+    </section>}
 
     <section className="landing-section community-panel" id="community"><div><span className="eyebrow">Community</span><h2>Guidance feels better when users do not feel alone.</h2><p>Future community features can support peer questions, alumni stories, expert sessions, webinars and country-specific groups. In this prototype, the demo shows the first layer: structured guidance and expert consultation flow.</p><button className="secondary" onClick={onDemo}>Explore support flow</button></div><div className="community-grid"><article><strong>Student circles</strong><small>Country and subject-based peer support</small></article><article><strong>Expert sessions</strong><small>Consultation booking and review history</small></article><article><strong>Success stories</strong><small>Real journey templates for motivation</small></article></div></section>
 
@@ -421,7 +469,22 @@ function ProgramCard({ program, score, profile, onOpen, saved, compared, onSave,
   )
 }
 
-function Dashboard({ setView, openProgram, savedIds, compareIds, toggleSaved, toggleCompare, profile, scores, notifications, plan, services, onSelectService, onAddService, career, preparation, jobApplications }: {
+function DemoPersonaSelector({ activeService, onApply }: { activeService: ServiceType, onApply: (persona: DemoPersonaId) => void }) {
+  const personas: Array<{ id: DemoPersonaId, name: string, role: string, goal: string, service: ServiceType, score: string, image: string }> = [
+    { id: 'samira', name: 'Samira', role: 'Bangladeshi CS graduate', goal: 'Study MSc Data Science abroad with scholarship support.', service: 'study', score: '74% study ready', image: 'linear-gradient(145deg,#3159d9,#80ddd1)' },
+    { id: 'rahim', name: 'Rahim', role: 'Unemployed graduate', goal: 'Become job-ready for a junior data analyst role.', service: 'job-preparation', score: '61% job ready', image: 'linear-gradient(145deg,#59467f,#1b756d)' },
+    { id: 'nadia', name: 'Nadia', role: 'Career switcher', goal: 'Move from business operations into product analytics.', service: 'career', score: '68% career ready', image: 'linear-gradient(145deg,#b16b24,#3159d9)' },
+  ]
+  return <section className="persona-switcher">
+    <div className="section-title"><div><span className="eyebrow">Demo personas</span><h2>Switch the prototype story instantly</h2></div><small>Presenter tool · updates mock data</small></div>
+    <div className="persona-grid">{personas.map((persona) => <button className={activeService === persona.service ? 'active' : ''} onClick={() => onApply(persona.id)} key={persona.id}>
+      <span className="persona-portrait" style={{ background: persona.image }}>{persona.name.slice(0, 1)}</span>
+      <div><strong>{persona.name}</strong><small>{persona.role}</small><p>{persona.goal}</p><em>{persona.score}</em></div>
+    </button>)}</div>
+  </section>
+}
+
+function Dashboard({ setView, openProgram, savedIds, compareIds, toggleSaved, toggleCompare, profile, scores, notifications, plan, services, onSelectService, onAddService, onApplyPersona, career, preparation, jobApplications }: {
   setView: (view: View) => void
   openProgram: (program: Program) => void
   savedIds: string[]
@@ -435,6 +498,7 @@ function Dashboard({ setView, openProgram, savedIds, compareIds, toggleSaved, to
   services: ServiceState
   onSelectService: (service: ServiceType) => void
   onAddService: (service: ServiceType) => void
+  onApplyPersona: (persona: DemoPersonaId) => void
   career: CareerProfile
   preparation: JobPreparationProfile
   jobApplications: JobApplication[]
@@ -499,6 +563,8 @@ function Dashboard({ setView, openProgram, savedIds, compareIds, toggleSaved, to
           <div><span className="eyebrow light">{serviceMeta[services.selected].label}</span><h2>{serviceContent.title}</h2><p>{serviceContent.text}</p></div>
           <div className="readiness"><div className="large-ring" style={{ background: `conic-gradient(#79d9cc 0 ${serviceContent.readiness}%,rgba(255,255,255,.16) ${serviceContent.readiness}%)` }}><span>{serviceContent.readiness}%</span></div><div><strong>{serviceContent.label}</strong><small>Calculated from saved progress</small></div></div>
         </section>
+
+        <DemoPersonaSelector activeService={services.selected} onApply={onApplyPersona} />
 
         <div className="service-tabs">{services.active.map((service) => <button className={services.selected === service ? 'active' : ''} onClick={() => onSelectService(service)} key={service}><span>{serviceMeta[service].icon}</span><div><strong>{serviceMeta[service].label}</strong><small>{serviceMeta[service].description}</small></div></button>)}{!services.active.includes('study') && <button className="add-service" onClick={() => onAddService('study')}><span>+</span><div><strong>Add Study Abroad</strong><small>{planningTrackCount(services.active)}/{plan.limits.activeGoals} planning-track limit</small></div></button>}{!services.active.some((service) => careerBundle.includes(service)) && <button className="add-service" onClick={() => onAddService('career')}><span>+</span><div><strong>Add Career Planning</strong><small>Includes career, preparation and job search</small></div></button>}</div>
 
@@ -1060,6 +1126,11 @@ function CareerPlan({ profile, career, setCareer, openExperts }: {
         <article><span>⌁</span><div><small>Priority gaps</small><strong>{primaryScore.gaps.slice(0, 2).join(', ') || 'Evidence building'}</strong></div></article>
       </div>
 
+      <section className="career-outcome-strip">
+        <div><span className="eyebrow">Career outcome logic</span><h2>From broad ambition to testable role direction</h2><p>The system compares interests, skills, background and work style, then turns the strongest role into a weekly evidence plan.</p></div>
+        <div>{[['Role confidence', `${primaryScore.score}%`], ['Skills matched', `${primaryScore.matchedSkills.length}/${primaryRole.coreSkills.length}`], ['Next gap', primaryScore.gaps[0] ?? 'Interview proof']].map(([label, value]) => <article key={label}><small>{label}</small><strong>{value}</strong></article>)}</div>
+      </section>
+
       <section className="panel career-profile-panel">
         <div className="section-title"><div><span className="eyebrow">Career baseline</span><h2>Your direction inputs</h2></div><button className="secondary" onClick={() => { setDraft(career); setEditing((value) => !value) }}>{editing ? 'Cancel' : 'Edit baseline'}</button></div>
         {editing ? <div className="career-editor">
@@ -1180,6 +1251,11 @@ function JobPreparation({ career, preparation, setPreparation, documents, openDo
         {[['CV readiness', cvScore, cvDocument?.status ?? 'missing'], ['Portfolio evidence', portfolioScore, `${readyPortfolioItems} ready`], ['Interview readiness', interviewScore, `${preparation.practiceSessions} practices`], ['Preparation roadmap', taskScore, `${preparation.completedTasks.length}/${jobPreparationTasks.length} tasks`]].map(([label, score, detail]) => <article key={label}><div><small>{label}</small><strong>{score}%</strong></div><div><span style={{ width: `${score}%` }} /></div><small>{detail}</small></article>)}
       </section>
 
+      <section className="candidate-journey-strip">
+        <div><span className="eyebrow">Candidate journey</span><h2>Prepare evidence before sending applications</h2><p>Navigator keeps the user focused on employer-facing proof: target role, CV clarity, portfolio, interview practice and document readiness.</p></div>
+        <div>{[['CV signals', `${cvSectionCount}/6 sections`], ['Portfolio', `${preparation.portfolioItems.length} item(s)`], ['Interview confidence', `${preparation.interviewConfidence}%`]].map(([label, value]) => <article key={label}><small>{label}</small><strong>{value}</strong></article>)}</div>
+      </section>
+
       <section className="panel job-target-panel">
         <div><span className="eyebrow">Preparation target</span><h2>Which role should this material be tailored for?</h2><p>Career Plan targets are available here. Choose one primary role for CV language, portfolio evidence and interview practice.</p></div>
         <select value={preparation.targetRoleId} onChange={(event) => setPreparation((current) => ({ ...current, targetRoleId: event.target.value }))}>{careerRoles.filter((role) => career.targetRoleIds.includes(role.id) || role.id === preparation.targetRoleId).map((role) => <option value={role.id} key={role.id}>{role.title}</option>)}</select>
@@ -1256,6 +1332,7 @@ function JobSearch({ profile, career, preparation, documents, applications, setA
     <div className="page-content">
       {toast && <Toast message={toast} onClose={() => setToast('')} />}
       <section className="job-search-hero"><div><span className="eyebrow light">Focused opportunity search</span><h2>Find roles that match the direction you prepared for.</h2><p>Prototype opportunities are matched to Career Plan targets and connected to a persistent application tracker.</p></div><div><strong>{matched.length}</strong><span>matched roles</span></div></section>
+      <section className="search-strategy-strip"><div><span className="eyebrow">Search strategy</span><h2>Less random applying. More accountable follow-up.</h2></div><div>{[['Target roles', targetIds.size], ['Tracked applications', applications.length], ['CV document', documents.find((item) => item.id === 'cv')?.status ?? 'missing']].map(([label, value]) => <article key={label}><small>{label}</small><strong>{value}</strong></article>)}</div></section>
       <div className="job-search-toolbar"><div className="search-box"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search title, company or skill" /></div><div>{['All', 'Remote', 'Hybrid', 'On-site'].map((item) => <button className={mode === item ? 'active' : ''} onClick={() => setMode(item)} key={item}>{item}</button>)}</div></div>
       <div className="job-search-layout">
         <main className="job-listings">{matched.length ? matched.map((job) => {
@@ -1760,6 +1837,37 @@ function App() {
     setView('dashboard')
     setAppToast(`${serviceMeta[service].label} added to your workspace.`)
   }
+  const applyDemoPersona = (persona: DemoPersonaId) => {
+    if (persona === 'samira') {
+      setProfile({ ...defaultProfile, fullName: 'Samira Rahman' })
+      setCareerProfile(defaultCareerProfile)
+      setJobPreparation(defaultJobPreparationProfile)
+      setJobApplications(defaultJobApplications)
+      setSavedIds(['tum-ds', 'aalto-ml'])
+      setCompareIds(['tum-ds', 'aalto-ml'])
+      setServices({ active: ['study'], selected: 'study' })
+      setView('dashboard')
+      setAppToast('Demo switched to Samira: study-abroad journey.')
+      return
+    }
+    if (persona === 'rahim') {
+      setProfile({ ...defaultProfile, fullName: 'Rahim Ahmed', goal: 'Job preparation', currentDegree: 'BBA in Management', institution: 'National University', cgpa: 3.12, subject: 'Business Analytics', preferredCountries: ['Bangladesh', 'Remote', 'Germany'], annualBudgetBdt: 350000, ieltsStatus: 'not-planned', transcriptReady: true, sponsorReady: false })
+      setCareerProfile({ experienceLevel: 'entry', careerGoal: 'first-role', targetTimeline: '3-months', workStyle: ['Analytical work', 'Problem solving', 'Continuous learning'], interests: ['Data and insights', 'Business strategy'], currentSkills: ['Excel', 'Presentation', 'Statistics'], targetRoleIds: ['data-analyst', 'business-analyst'], completedTasks: ['career-baseline', 'role-shortlist'] })
+      setJobPreparation({ ...defaultJobPreparationProfile, targetRoleId: 'data-analyst', interviewConfidence: 35, practiceSessions: 1, completedTasks: ['job-target', 'cv-baseline'], cvSections: { summary: true, skills: true, experience: false, projects: false, education: true, achievements: false }, portfolioItems: [{ id: 'rahim-portfolio-1', title: 'Sales dashboard in Excel', type: 'project', status: 'draft' }], cvDraft: { headline: 'Entry-level Data Analyst', summary: 'Business graduate learning data analysis with Excel, SQL and statistics to support practical decisions.', experience: 'Add internship, volunteer or academic evidence with measurable outcomes.', projects: 'Sales dashboard in Excel — draft project showing revenue trends and customer segments.', skills: 'Excel, Statistics, Presentation' } })
+      setJobApplications([{ jobId: 'job-1', status: 'preparing', nextAction: 'Add SQL evidence and tailor project bullets', notes: 'Needs stronger portfolio proof before applying.' }])
+      setServices({ active: careerBundle, selected: 'job-preparation' })
+      setView('dashboard')
+      setAppToast('Demo switched to Rahim: unemployment to job-ready journey.')
+      return
+    }
+    setProfile({ ...defaultProfile, fullName: 'Nadia Chowdhury', goal: 'Career planning', currentDegree: 'BBA in Marketing', institution: 'BRAC University', cgpa: 3.44, subject: 'Product Analytics', preferredCountries: ['Bangladesh', 'Remote', 'Canada'], annualBudgetBdt: 700000, transcriptReady: true })
+    setCareerProfile({ experienceLevel: 'mid', careerGoal: 'career-change', targetTimeline: '6-months', workStyle: ['Analytical work', 'Technology products', 'Cross-team collaboration'], interests: ['Technology products', 'Data and insights', 'Business strategy'], currentSkills: ['Excel', 'Presentation', 'Stakeholder communication', 'Product metrics'], targetRoleIds: ['product-analyst', 'business-analyst'], completedTasks: ['career-baseline', 'role-shortlist', 'skill-audit', 'priority-gap'] })
+    setJobPreparation({ ...defaultJobPreparationProfile, targetRoleId: 'product-analyst', interviewConfidence: 58, practiceSessions: 3, completedTasks: ['job-target', 'cv-baseline', 'cv-impact', 'linkedin-positioning'], portfolioItems: [{ id: 'nadia-portfolio-1', title: 'Marketing funnel analysis', type: 'case-study', status: 'ready' }] })
+    setJobApplications([{ jobId: 'job-2', status: 'saved', nextAction: 'Tailor product metrics story', notes: 'Good role match; needs experimentation story.' }])
+    setServices({ active: careerBundle, selected: 'career' })
+    setView('dashboard')
+    setAppToast('Demo switched to Nadia: career-switcher journey.')
+  }
   const toggleSaved = (id: string) => setSavedIds((current) => {
     if (current.includes(id)) return current.filter((item) => item !== id)
     if (current.length >= currentPlan.limits.shortlist) {
@@ -1796,7 +1904,7 @@ function App() {
       <Sidebar view={view} setView={setView} onLogout={logout} documentCount={missingDocuments} planId={currentPlan.id} onLocked={requestUpgrade} profile={profile} services={services} onServiceChange={selectService} />
       <main className="workspace" id="main-workspace" tabIndex={-1}>
         {appToast && <Toast message={appToast} onClose={() => setAppToast('')} />}
-        {view === 'dashboard' && <Dashboard setView={setView} openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} profile={profile} scores={scores} notifications={notifications} plan={currentPlan} services={services} onSelectService={selectService} onAddService={addService} career={careerProfile} preparation={jobPreparation} jobApplications={jobApplications} />}
+        {view === 'dashboard' && <Dashboard setView={setView} openProgram={openProgram} savedIds={savedIds} compareIds={compareIds} toggleSaved={toggleSaved} toggleCompare={toggleCompare} profile={profile} scores={scores} notifications={notifications} plan={currentPlan} services={services} onSelectService={selectService} onAddService={addService} onApplyPersona={applyDemoPersona} career={careerProfile} preparation={jobPreparation} jobApplications={jobApplications} />}
         {view === 'study-plan' && <StudyPlan profile={profile} documents={normalizedDocuments} savedIds={savedIds} scores={scores} applications={applications} setApplications={setApplications} setView={setView} openProgram={openProgram} />}
         {view === 'career-plan' && <CareerPlan profile={profile} career={careerProfile} setCareer={setCareerProfile} openExperts={() => setView('experts')} />}
         {view === 'job-preparation' && <JobPreparation career={careerProfile} preparation={jobPreparation} setPreparation={setJobPreparation} documents={normalizedDocuments} openDocuments={() => setView('documents')} openExperts={() => setView('experts')} premiumCv={canUseFeature(currentPlan.id, 'premiumCv')} onUpgrade={() => requestUpgrade('premiumCv')} />}
