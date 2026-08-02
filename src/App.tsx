@@ -113,7 +113,7 @@ function ExternalLink({ href, children, className = '' }: { href: string, childr
   return <a className={`external-link ${className}`} href={href} target="_blank" rel="noreferrer noopener">{children} <span aria-hidden="true">↗</span></a>
 }
 
-function PublicLanding({ onStart, onDemo }: { onStart: () => void, onDemo: () => void }) {
+export function PublicLanding({ onStart, onDemo }: { onStart: () => void, onDemo: () => void }) {
   return <main className="landing-page">
     <header className="landing-nav"><Logo onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} /><nav aria-label="Public navigation"><a href="#how-it-works">How it works</a><a href="#features">Features</a><a href="#plans">Plans</a></nav><div><button className="text-button" onClick={onStart}>Log in</button><button className="primary small" onClick={onStart}>Build my plan</button></div></header>
     <section className="landing-hero">
@@ -124,6 +124,51 @@ function PublicLanding({ onStart, onDemo }: { onStart: () => void, onDemo: () =>
     <section className="landing-section" id="how-it-works"><span className="eyebrow">How it works</span><h2>Guidance that changes when your reality changes.</h2><div className="landing-steps">{[['01','Map your profile','Add your academic background, budget, destinations and target intake.'],['02','See the trade-offs','Compare fit, funding pressure, readiness gaps and practical next steps.'],['03','Follow one plan','Track documents, applications, expert reviews, visa and departure work.']].map(([number,title,text]) => <article key={number}><span>{number}</span><h3>{title}</h3><p>{text}</p></article>)}</div></section>
     <section className="landing-section landing-features" id="features"><div><span className="eyebrow light">Built for consequential choices</span><h2>More than a list of universities.</h2><p>Navigator connects recommendations to the work required to make them possible.</p></div><div className="feature-list"><article><span>✦</span><strong>Profile-aware matching</strong><p>Recommendations recalculate around academics, budget, destinations and readiness.</p></article><article><span>◇</span><strong>Application workspace</strong><p>Move from shortlist to documents, funding, submission, visa and departure.</p></article><article><span>◎</span><strong>Human review when needed</strong><p>Prepare a structured case and selectively share it with an expert.</p></article></div></section>
     <section className="landing-cta" id="plans"><span className="eyebrow">Start with the free discovery plan</span><h2>Your next decision should feel smaller than your whole future.</h2><button className="primary" onClick={onStart}>Start building my plan →</button></section>
+    <footer className="landing-footer"><Logo /><span>Global study, career and job guidance prototype · 2026</span></footer>
+  </main>
+}
+
+function InvestorLanding({ onStart, onDemo }: { onStart: () => void, onDemo: () => void }) {
+  const services = [
+    { title: 'Study abroad', text: 'Country, university, scholarship, cost and application roadmap.', metric: 'Program fit + funding pressure', icon: '01' },
+    { title: 'Career planning', text: 'Role direction, skill gap, evidence building and expert review.', metric: 'Career readiness score', icon: '02' },
+    { title: 'Job preparation', text: 'CV, portfolio, interview confidence and document checklist.', metric: 'Candidate readiness', icon: '03' },
+    { title: 'Job search', text: 'Matched opportunities, application tracking and follow-up discipline.', metric: 'Search momentum', icon: '04' },
+  ]
+  const dataSignals = [
+    ['Profile data', 'CGPA, degree, subject, IELTS, budget, documents and goals'],
+    ['Market data', 'Programs, tuition, scholarship rules, deadlines and job context'],
+    ['Readiness data', 'Roadmap progress, missing documents, risk flags and next actions'],
+    ['Expert data', 'Review notes, consultation history and recommended corrections'],
+  ]
+  const journeys = [
+    { person: 'Samira', goal: 'MSc Data Science abroad', outcome: 'Finds 3 strong programs, sees a funding gap, and starts IELTS plus scholarship tasks.', score: '74% study ready' },
+    { person: 'Rahim', goal: 'Unemployed graduate', outcome: 'Chooses a target role, improves CV evidence, and tracks job applications weekly.', score: '61% job ready' },
+  ]
+
+  return <main className="landing-page">
+    <header className="landing-nav">
+      <Logo onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
+      <nav aria-label="Public navigation"><a href="#services">Services</a><a href="#how-it-works">How it works</a><a href="#data-engine">Data logic</a><a href="#journeys">Demo stories</a></nav>
+      <div><button className="text-button" onClick={onStart}>Log in</button><button className="primary small" onClick={onDemo}>Open demo</button></div>
+    </header>
+
+    <section className="landing-hero">
+      <div><span className="eyebrow">AI guidance for study, career and jobs</span><h1>A personal route from <em>confused</em> to ready.</h1><p>Project Navigator turns a user profile into recommendations, roadmaps, document tracking, expert review and progress monitoring.</p><div className="landing-actions"><button className="primary" onClick={onDemo}>Explore the working demo -&gt;</button><button className="secondary" onClick={onStart}>Create my profile</button></div><small>Prototype uses fixed mock data. No payment required.</small></div>
+      <div className="landing-preview" aria-label="Product preview"><div className="preview-head"><span>Samira's study plan</span><strong>74% ready</strong></div><div className="preview-route"><span className="done">✓</span><div><strong>Profile and goals</strong><small>Academic, budget and destination profile mapped</small></div></div><div className="preview-route"><span className="active">2</span><div><strong>Research and shortlist</strong><small>3 strong programme matches found</small></div></div><div className="preview-route"><span>3</span><div><strong>Tests and documents</strong><small>IELTS and transcript are next priorities</small></div></div><div className="preview-match"><small>Strongest current match</small><strong>Technical University of Munich</strong><span>88% profile fit · funding gap detected</span></div></div>
+    </section>
+
+    <section className="landing-proof"><span>One connected workspace for</span><div><strong>Programme discovery</strong><strong>Career readiness</strong><strong>Document tracking</strong><strong>Expert review</strong></div></section>
+
+    <section className="landing-section landing-services" id="services"><span className="eyebrow">Services</span><h2>Start with one goal. Expand when the user needs more guidance.</h2><div className="service-showcase">{services.map((service) => <article key={service.title}><span>{service.icon}</span><h3>{service.title}</h3><p>{service.text}</p><small>{service.metric}</small></article>)}</div></section>
+
+    <section className="landing-section" id="how-it-works"><span className="eyebrow">How it works</span><h2>A simple flow the user can actually follow.</h2><div className="landing-flow">{[['Profile', 'User gives academic, financial, career and document information.'], ['Analyze', 'The system scores fit, risk, readiness and missing evidence.'], ['Recommend', 'Navigator suggests countries, programs, tasks, jobs or expert help.'], ['Track', 'Progress, documents, applications and consultations stay visible.']].map(([title, text], index) => <article key={title}><span>{index + 1}</span><strong>{title}</strong><p>{text}</p></article>)}</div><button className="secondary landing-section-action" onClick={onDemo}>See this flow inside the demo</button></section>
+
+    <section className="landing-section landing-data" id="data-engine"><div><span className="eyebrow light">Data-driven guidance</span><h2>Not only advice. A decision system.</h2><p>The prototype shows how user data, market data and progress data can combine into clear recommendations. In the full product, these sources can be synced through APIs, partners and verified manual datasets.</p><button className="primary" onClick={onDemo}>Open data-based demo</button></div><div className="data-signal-grid">{dataSignals.map(([title, text]) => <article key={title}><strong>{title}</strong><p>{text}</p></article>)}</div></section>
+
+    <section className="landing-section landing-journeys" id="journeys"><span className="eyebrow">Sample journeys</span><h2>Show outcomes, not just features.</h2><div className="journey-grid">{journeys.map((journey) => <article key={journey.person}><div><strong>{journey.person}</strong><span>{journey.score}</span></div><h3>{journey.goal}</h3><p>{journey.outcome}</p><button className="text-button" onClick={onDemo}>View demo journey -&gt;</button></article>)}</div></section>
+
+    <section className="landing-cta" id="plans"><span className="eyebrow">Prototype ready for investor walkthrough</span><h2>Make the first conversation clear: problem, flow, data, guidance and progress.</h2><div className="landing-actions center"><button className="primary" onClick={onDemo}>Launch demo account -&gt;</button><button className="secondary" onClick={onStart}>Start from signup</button></div></section>
     <footer className="landing-footer"><Logo /><span>Global study, career and job guidance prototype · 2026</span></footer>
   </main>
 }
@@ -155,7 +200,7 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (isNew: boolean) => 
     onAuthenticated(false)
   }
 
-  if (!showAuth) return <PublicLanding onStart={() => setShowAuth(true)} onDemo={useDemo} />
+  if (!showAuth) return <InvestorLanding onStart={() => setShowAuth(true)} onDemo={useDemo} />
 
   return (
     <main className="auth-page">
