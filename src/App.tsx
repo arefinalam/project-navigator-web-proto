@@ -400,6 +400,34 @@ function Dashboard({ setView, openProgram, savedIds, compareIds, toggleSaved, to
       : services.selected === 'job-preparation'
         ? [['23', 'JUN', 'CV evidence'], ['27', 'JUN', 'Interview practice'], ['03', 'JUL', 'Portfolio review']]
         : [['22', 'JUN', 'Review saved jobs'], ['26', 'JUN', 'Tailor application'], ['01', 'JUL', 'Follow-up review']]
+  const bestProgram = topPrograms[0]
+  const bestScore = bestProgram ? scores[bestProgram.id] : undefined
+  const flowSteps: Array<{ number: string, title: string, text: string, view: View, metric: string }> = services.selected === 'study'
+    ? [
+      { number: '01', title: 'Profile mapping', text: 'Academic result, English status, budget, subject and destination preferences are converted into a guidance profile.', view: 'profile', metric: `${Math.round(profile.cgpa / 4 * 100)}% academic signal` },
+      { number: '02', title: 'Data matching', text: 'Programs are ranked by academic fit, budget pressure, career alignment and funding possibility.', view: 'explore', metric: bestScore ? `${bestScore.overall}% top match` : 'Live ranking' },
+      { number: '03', title: 'Decision support', text: 'Shortlist, compare cost, check scholarships, and understand why a destination is recommended.', view: 'shortlist', metric: `${savedIds.length}/${plan.limits.shortlist === 999 ? '∞' : plan.limits.shortlist} saved` },
+      { number: '04', title: 'Execution plan', text: 'The roadmap turns research into tasks: tests, documents, applications, funding, visa and departure.', view: 'study-plan', metric: `${serviceContent.readiness}% ready` },
+      { number: '05', title: 'Human review', text: 'When the case is ready, the user can book an expert and share only selected documents.', view: 'experts', metric: plan.limits.expertCredits ? `${plan.limits.expertCredits} credit/month` : 'Book when needed' },
+    ]
+    : [
+      { number: '01', title: 'Goal diagnosis', text: 'The user selects a direction and the platform maps skills, confidence, evidence and urgency.', view: 'profile', metric: `${serviceContent.readiness}% baseline` },
+      { number: '02', title: 'Skill and evidence plan', text: 'Recommended tasks connect the target role to projects, CV proof and interview stories.', view: serviceContent.actionView, metric: `${career.completedTasks.length + preparation.completedTasks.length} tasks done` },
+      { number: '03', title: 'Document readiness', text: 'CV, certificates, references and supporting files stay in one checklist-based workspace.', view: 'documents', metric: `${Object.values(preparation.cvSections).filter(Boolean).length}/6 CV sections` },
+      { number: '04', title: 'Opportunity tracking', text: 'Applications and follow-ups become visible, so the user does not lose momentum.', view: 'job-search', metric: `${jobApplications.length} tracked` },
+      { number: '05', title: 'Expert review', text: 'The user can prepare a clear case and get structured professional feedback.', view: 'experts', metric: 'Review-ready case' },
+    ]
+  const benefitCards = services.selected === 'study'
+    ? [
+      { label: 'Clear next step', value: serviceContent.action, text: 'The user does not need to guess what to do first.' },
+      { label: 'Best visible option', value: bestProgram ? bestProgram.university : 'Program ranking', text: bestScore ? `${bestScore.overall}% match based on profile, budget and career fit.` : 'Program list updates from profile data.' },
+      { label: 'Risk signal', value: profile.sponsorReady ? 'Funding evidence ready' : 'Funding evidence pending', text: 'The prototype highlights weak points before application deadlines.' },
+    ]
+    : [
+      { label: 'Clear next step', value: serviceContent.action, text: 'The user sees one useful action instead of generic advice.' },
+      { label: 'Target direction', value: careerRole.title, text: 'Career guidance is connected to role requirements and current skills.' },
+      { label: 'Evidence readiness', value: `${cvReady}% CV ready`, text: 'Preparation focuses on proof, not only motivation.' },
+    ]
   return (
     <>
       <Topbar title="Overview" notifications={notifications} onNotification={(item) => setView(item.action)} />
@@ -416,6 +444,38 @@ function Dashboard({ setView, openProgram, savedIds, compareIds, toggleSaved, to
           <div className="stat-card"><span className="stat-icon green">✓</span><div><strong>{services.selected === 'career' ? `${career.completedTasks.length}/${careerTasks.length}` : services.selected === 'job-preparation' ? `${preparation.completedTasks.length}/${jobPreparationTasks.length}` : services.selected === 'job-search' ? jobApplications.length : savedIds.length}</strong><small>{services.selected === 'study' ? 'Saved programmes' : services.selected === 'job-search' ? 'Tracked applications' : 'Roadmap tasks complete'}</small></div><em>On track</em></div>
           <div className="stat-card"><span className="stat-icon amber">◷</span><div><strong>{upcoming.length}</strong><small>Upcoming actions</small></div><em>Next: {upcoming[0][0]} Jun</em></div>
         </div>
+
+        <section className="demo-flow-panel">
+          <div className="section-title">
+            <div><span className="eyebrow">How it works</span><h2>From profile to guided outcome</h2></div>
+            <button className="secondary" onClick={() => setView(services.selected === 'study' ? 'study-plan' : serviceContent.actionView)}>Open full workspace</button>
+          </div>
+          <div className="flow-rail">
+            {flowSteps.map((step, index) => <button className="flow-step" onClick={() => setView(step.view)} key={step.number}>
+              <span className="flow-number">{step.number}</span>
+              <div>
+                <strong>{step.title}</strong>
+                <p>{step.text}</p>
+                <small>{step.metric}</small>
+              </div>
+              {index < flowSteps.length - 1 && <em aria-hidden="true">→</em>}
+            </button>)}
+          </div>
+        </section>
+
+        <section className="benefit-panel">
+          <div className="section-title">
+            <div><span className="eyebrow">How this helps the user</span><h2>Friendly guidance backed by visible data</h2></div>
+            <button className="text-button" onClick={() => setView('adviser')}>Ask Navigator →</button>
+          </div>
+          <div className="benefit-grid">
+            {benefitCards.map((item) => <article key={item.label}>
+              <small>{item.label}</small>
+              <strong>{item.value}</strong>
+              <p>{item.text}</p>
+            </article>)}
+          </div>
+        </section>
 
         <div className="dashboard-grid">
           <section className="panel next-action">
